@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Play, Star, Trash2, X, Film } from 'lucide-react'
+import { Play, Star, Trash2, X, Film, Dumbbell, Lightbulb } from 'lucide-react'
 import { CHARACTERS } from './constants'
 
 interface Bookmark {
@@ -8,6 +8,7 @@ interface Bookmark {
   fileName: string
   startFrame: number
   endFrame: number
+  playerIndex?: number
   playerCharacter?: number
   opponentCharacter?: number
   damage: number
@@ -34,6 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 function Bookmarks({ onPlayCombo }: Props) {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
+  const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
 
   useEffect(() => {
     loadBookmarks()
@@ -75,6 +77,43 @@ function Bookmarks({ onPlayCombo }: Props) {
       }
     } catch (e) {
       console.error('Failed to play queue:', e)
+    }
+  }
+
+  const analyzeBookmark = async (b: Bookmark) => {
+    const key = b.id
+    setAnalyses((prev) => ({ ...prev, [key]: { loading: true, opportunities: [] } }))
+
+    let playerIndex = b.playerIndex
+    // Fallback: if old bookmark lacks playerIndex, try to get it from replay
+    if (playerIndex === undefined) {
+      try {
+        const game = await window.electron.getReplayWinner(b.path)
+        // We can't easily get playerIndex from getReplayWinner, so we'll skip analysis for old bookmarks
+        // Or we could add a new IPC handler, but for now just skip
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
+        alert('This bookmark was saved before analysis support was added. Please re-bookmark it from the Combos tab.')
+        return
+      } catch (e) {
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
+        return
+      }
+    }
+
+    try {
+      const result = await window.electron.analyzeMissedOpportunities(
+        b.path,
+        b.startFrame,
+        b.endFrame,
+        playerIndex
+      )
+      if (result.success) {
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: result.opportunities } }))
+      } else {
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
+      }
+    } catch (e) {
+      setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
     }
   }
 
@@ -130,59 +169,134 @@ function Bookmarks({ onPlayCombo }: Props) {
           </div>
         ) : (
           <div className="grid gap-2">
-            {bookmarks.map((b) => (
-              <div
-                key={b.id}
-                className="card rounded-xl p-4 group flex items-center justify-between gap-4"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-base font-bold text-cyan-400">
-                      {CHARACTERS[b.playerCharacter ?? -1] || 'Unknown'}
-                    </span>
-                    <span className="text-sm text-slate-500">
-                      {b.didKill ? 'took stock from' : 'comboed'}
-                    </span>
-                    <span className="text-base font-bold text-slate-300">
-                      {CHARACTERS[b.opponentCharacter ?? -1] || 'Unknown'}
-                    </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700/50 font-mono-data ${CATEGORY_COLORS[b.category] || 'text-slate-400'}`}>
-                      {b.category}
-                    </span>
-                    {b.didKill && (
-                      <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-orbitron">
-                        <Star size={8} fill="currentColor" />
-                        STOCK
-                      </span>
-                    )}
+            {bookmarks.map((b) => {
+              const analysis = analyses[b.id]
+              return (
+                <div
+                  key={b.id}
+                  className="card rounded-xl p-4 group"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-base font-bold text-cyan-400">
+                          {CHARACTERS[b.playerCharacter ?? -1] || 'Unknown'}
+                        </span>
+                        <span className="text-sm text-slate-500">
+                          {b.didKill ? 'took stock from' : 'comboed'}
+                        </span>
+                        <span className="text-base font-bold text-slate-300">
+                          {CHARACTERS[b.opponentCharacter ?? -1] || 'Unknown'}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700/50 font-mono-data ${CATEGORY_COLORS[b.category] || 'text-slate-400'}`}>
+                          {b.category}
+                        </span>
+                        {b.didKill && (
+                          <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-orbitron">
+                            <Star size={8} fill="currentColor" />
+                            STOCK
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-600 font-mono-data">
+                        <span>{b.fileName}</span>
+                        <span>·</span>
+                        <span>Frame {b.startFrame.toLocaleString()}</span>
+                        <span>·</span>
+                        <span className="text-purple-400 font-bold">{Math.round(b.damage)}%</span>
+                        <span>·</span>
+                        <span>{new Date(b.date).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => analyzeBookmark(b)}
+                        className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-orbitron tracking-wider text-orange-400 hover:text-orange-300 border border-orange-500/20 hover:border-orange-500/30 bg-orange-500/5 hover:bg-orange-500/10 transition"
+                        title="Analyze missed opportunities"
+                      >
+                        <Lightbulb size={12} />
+                        ANALYZE
+                      </button>
+                      <button
+                        onClick={() => onPlayCombo(b.path, b.startFrame)}
+                        className="flex items-center gap-2 h-9 px-4 btn-play rounded-lg text-xs"
+                      >
+                        <Play size={12} fill="currentColor" />
+                        PLAY
+                      </button>
+                      <button
+                        onClick={() => removeBookmark(b.id)}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-600 font-mono-data">
-                    <span>{b.fileName}</span>
-                    <span>·</span>
-                    <span>Frame {b.startFrame.toLocaleString()}</span>
-                    <span>·</span>
-                    <span className="text-purple-400 font-bold">{Math.round(b.damage)}%</span>
-                    <span>·</span>
-                    <span>{new Date(b.date).toLocaleDateString()}</span>
-                  </div>
+
+                  {/* Missed opportunities analysis */}
+                  {analysis && (
+                    <div className="mt-2">
+                      {analysis.loading ? (
+                        <div className="flex items-center gap-2 text-xs text-orange-400/70 font-mono-data">
+                          <div className="w-3 h-3 border-2 border-orange-500/30 border-t-orange-400 rounded-full animate-spin" />
+                          Analyzing frames...
+                        </div>
+                      ) : analysis.opportunities.length === 0 ? (
+                        <div className="text-xs text-slate-600 font-mono-data">
+                          No missed opportunities detected in this interaction.
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {analysis.opportunities.map((opp: any, i: number) => (
+                            <div
+                              key={i}
+                              className={`p-2.5 rounded-lg border ${
+                                opp.type === 'missed-tech'
+                                  ? 'bg-red-500/5 border-red-500/10'
+                                  : opp.type === 'wrong-read-tech-chase'
+                                  ? 'bg-orange-500/5 border-orange-500/10'
+                                  : 'bg-yellow-500/5 border-yellow-500/10'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <Dumbbell size={12} className={
+                                  opp.type === 'missed-tech' ? 'text-red-400' :
+                                  opp.type === 'wrong-read-tech-chase' ? 'text-orange-400' :
+                                  'text-yellow-400'
+                                } />
+                                <span className={`text-xs font-bold font-orbitron ${
+                                  opp.type === 'missed-tech' ? 'text-red-300' :
+                                  opp.type === 'wrong-read-tech-chase' ? 'text-orange-300' :
+                                  'text-yellow-300'
+                                }`}>
+                                  {opp.description}
+                                </span>
+                                <span className="text-[10px] text-slate-600 font-mono-data ml-auto">
+                                  Frame {opp.frame.toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-mono-data leading-relaxed">
+                                {opp.suggestion}
+                              </p>
+                              <button
+                                onClick={async () => {
+                                  const result = await window.electron.launchUnclePunch()
+                                  if (!result.success) alert(result.error)
+                                }}
+                                className="mt-1.5 flex items-center gap-1.5 text-[11px] font-orbitron tracking-wider text-orange-400 hover:text-orange-300 transition"
+                              >
+                                <Dumbbell size={11} />
+                                PRACTICE IN UNCLE PUNCH → {opp.unclePunchEvent.toUpperCase()}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => onPlayCombo(b.path, b.startFrame)}
-                    className="flex items-center gap-2 h-9 px-4 btn-play rounded-lg text-xs"
-                  >
-                    <Play size={12} fill="currentColor" />
-                    PLAY
-                  </button>
-                  <button
-                    onClick={() => removeBookmark(b.id)}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

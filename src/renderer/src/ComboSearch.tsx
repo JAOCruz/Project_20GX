@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star } from 'lucide-react'
+import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName, getSearchableMoves, formatComboString } from './moves'
 
@@ -82,6 +82,25 @@ function matchesSequence(moves: ComboMove[], sequence: number[]): boolean {
 }
 
 function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgress }: Props) {
+  const analyzeCombo = async (conv: any) => {
+    const key = `${conv.path}-${conv.startFrame}`
+    setAnalyses((prev) => ({ ...prev, [key]: { loading: true, opportunities: [] } }))
+    try {
+      const result = await window.electron.analyzeMissedOpportunities(
+        conv.path,
+        conv.startFrame,
+        conv.endFrame,
+        conv.playerIndex
+      )
+      if (result.success) {
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: result.opportunities } }))
+      } else {
+        setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
+      }
+    } catch (e) {
+      setAnalyses((prev) => ({ ...prev, [key]: { loading: false, opportunities: [] } }))
+    }
+  }
   const [charFilter, setCharFilter] = useState<number | null>(null)
   const [opponentFilter, setOpponentFilter] = useState<number | null>(null)
   const [stageFilter, setStageFilter] = useState<number | null>(null)
@@ -92,6 +111,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const [tagFilter, setTagFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [expandedGame, setExpandedGame] = useState<string | null>(null)
+  const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
 
   // Extract all conversions from all replays
   const allConversions = useMemo(() => {
@@ -619,6 +639,14 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
                               <button
+                                onClick={() => analyzeCombo(conv)}
+                                className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-orbitron tracking-wider text-orange-400 hover:text-orange-300 border border-orange-500/20 hover:border-orange-500/30 bg-orange-500/5 hover:bg-orange-500/10 transition"
+                                title="Analyze missed opportunities"
+                              >
+                                <Lightbulb size={12} />
+                                ANALYZE
+                              </button>
+                              <button
                                 onClick={async () => {
                                   try {
                                     await window.electron.addBookmark({
@@ -626,6 +654,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                       fileName: replay.fileName,
                                       startFrame: conv.startFrame,
                                       endFrame: conv.endFrame,
+                                      playerIndex: conv.playerIndex,
                                       playerCharacter: conv.playerCharacter,
                                       opponentCharacter: conv.opponentCharacter,
                                       damage: conv.damage,
@@ -651,6 +680,71 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                               </button>
                             </div>
                           </div>
+
+                          {/* Missed opportunities analysis */}
+                          {(() => {
+                            const key = `${conv.path}-${conv.startFrame}`
+                            const analysis = analyses[key]
+                            if (!analysis) return null
+                            if (analysis.loading) return (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-orange-400/70 font-mono-data">
+                                <div className="w-3 h-3 border-2 border-orange-500/30 border-t-orange-400 rounded-full animate-spin" />
+                                Analyzing frames...
+                              </div>
+                            )
+                            if (analysis.opportunities.length === 0) return (
+                              <div className="mt-2 text-xs text-slate-600 font-mono-data">
+                                No missed opportunities detected in this interaction.
+                              </div>
+                            )
+                            return (
+                              <div className="mt-2 space-y-1.5">
+                                {analysis.opportunities.map((opp: any, i: number) => (
+                                  <div
+                                    key={i}
+                                    className={`p-2.5 rounded-lg border ${
+                                      opp.type === 'missed-tech'
+                                        ? 'bg-red-500/5 border-red-500/10'
+                                        : opp.type === 'wrong-read-tech-chase'
+                                        ? 'bg-orange-500/5 border-orange-500/10'
+                                        : 'bg-yellow-500/5 border-yellow-500/10'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Dumbbell size={12} className={
+                                        opp.type === 'missed-tech' ? 'text-red-400' :
+                                        opp.type === 'wrong-read-tech-chase' ? 'text-orange-400' :
+                                        'text-yellow-400'
+                                      } />
+                                      <span className={`text-xs font-bold font-orbitron ${
+                                        opp.type === 'missed-tech' ? 'text-red-300' :
+                                        opp.type === 'wrong-read-tech-chase' ? 'text-orange-300' :
+                                        'text-yellow-300'
+                                      }`}>
+                                        {opp.description}
+                                      </span>
+                                      <span className="text-[10px] text-slate-600 font-mono-data ml-auto">
+                                        Frame {opp.frame.toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 font-mono-data leading-relaxed">
+                                      {opp.suggestion}
+                                    </p>
+                                    <button
+                                      onClick={async () => {
+                                        const result = await window.electron.launchUnclePunch()
+                                        if (!result.success) alert(result.error)
+                                      }}
+                                      className="mt-1.5 flex items-center gap-1.5 text-[11px] font-orbitron tracking-wider text-orange-400 hover:text-orange-300 transition"
+                                    >
+                                      <Dumbbell size={11} />
+                                      PRACTICE IN UNCLE PUNCH → {opp.unclePunchEvent.toUpperCase()}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
                       ))}
                     </div>

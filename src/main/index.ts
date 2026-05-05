@@ -6,6 +6,7 @@ import { SlippiGame } from '@slippi/slippi-js'
 import { exec } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { analyzeMissedOpportunities } from './analyzer'
 
 const store = new Store()
 
@@ -584,6 +585,17 @@ ipcMain.handle('index-combos', async (_, daysBack: number = 0) => {
   return { indexed, skipped, total: files.length }
 })
 
+ipcMain.handle('analyze-missed-opportunities', async (_, replayPath: string, startFrame: number, endFrame: number, playerIndex: number) => {
+  try {
+    const game = new SlippiGame(replayPath)
+    const opportunities = analyzeMissedOpportunities(game, startFrame, endFrame, playerIndex)
+    return { success: true, opportunities }
+  } catch (e) {
+    console.error('Analyzer failed:', e)
+    return { success: false, error: String(e), opportunities: [] }
+  }
+})
+
 ipcMain.handle('get-replay-winner', async (_, replayPath: string) => {
   try {
     const game = new SlippiGame(replayPath)
@@ -805,6 +817,7 @@ interface Bookmark {
   fileName: string
   startFrame: number
   endFrame: number
+  playerIndex?: number
   playerCharacter?: number
   opponentCharacter?: number
   damage: number

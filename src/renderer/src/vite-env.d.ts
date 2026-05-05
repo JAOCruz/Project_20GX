@@ -9,6 +9,7 @@ interface Window {
     scanReplays: (folderPath: string) => Promise<{ replays: any[]; total: number; cancelled?: boolean }>
     cancelScan: () => Promise<boolean>
     indexCombos: (daysBack?: number) => Promise<{ indexed: number; skipped: number; total: number }>
+    analyzeMissedOpportunities: (replayPath: string, startFrame: number, endFrame: number, playerIndex: number) => Promise<{ success: boolean; error?: string; opportunities: any[] }>
     getReplayWinner: (replayPath: string) => Promise<{ winnerPort: number | null }>
     openReplay: (replayPath: string, startFrame?: number) => Promise<{ success: boolean; error?: string; frameSeek?: boolean; fallback?: boolean }>
     getTrainingMods: () => Promise<{ available: boolean; error?: string; codes?: { id: string; name: string; enabled: boolean }[] }>

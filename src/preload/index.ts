@@ -8,6 +8,8 @@ const api = {
   scanReplays: (folderPath: string) => ipcRenderer.invoke('scan-replays', folderPath),
   cancelScan: () => ipcRenderer.invoke('cancel-scan'),
   indexCombos: (daysBack?: number) => ipcRenderer.invoke('index-combos', daysBack),
+  analyzeMissedOpportunities: (replayPath: string, startFrame: number, endFrame: number, playerIndex: number) =>
+    ipcRenderer.invoke('analyze-missed-opportunities', replayPath, startFrame, endFrame, playerIndex),
   getReplayWinner: (replayPath: string) => ipcRenderer.invoke('get-replay-winner', replayPath),
   openReplay: (replayPath: string, startFrame?: number) =>
     ipcRenderer.invoke('open-replay', replayPath, startFrame),
