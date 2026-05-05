@@ -790,7 +790,7 @@ function App() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-2xl mx-auto py-8 px-6">
+          <div className="max-w-2xl mx-auto py-8 px-6 h-full overflow-y-auto">
             <div className="mb-8">
               <h2 className="font-orbitron text-2xl font-bold text-cyan-400 tracking-wider">System Setup</h2>
               <p className="text-sm text-slate-600 mt-1 font-mono-data">Configure paths for optimal performance</p>
