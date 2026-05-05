@@ -16,7 +16,8 @@ import {
   ChevronUp,
   X,
   Dumbbell,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import ComboSearch from './ComboSearch'
@@ -262,6 +263,27 @@ function App() {
     }
   }
 
+  const handleRefresh = async () => {
+    if (!config.replayFolder) {
+      setError('No replay folder configured. Go to Settings.')
+      return
+    }
+    setLoading(true)
+    setIndexing(true)
+    setError('')
+    try {
+      const scanResult = await window.electron.scanReplays(config.replayFolder)
+      setReplays(scanResult.replays)
+      await window.electron.indexCombos()
+      const indexResult = await window.electron.scanReplays(config.replayFolder)
+      setReplays(indexResult.replays)
+    } catch (e) {
+      setError('Refresh failed')
+    }
+    setLoading(false)
+    setIndexing(false)
+  }
+
   const loadTrainingMods = async () => {
     try {
       const result = await window.electron.getTrainingMods()
@@ -409,7 +431,19 @@ function App() {
           </div>
         </div>
 
-        <nav className="flex gap-1 p-1 rounded-xl bg-slate-900/60 border border-slate-700/20" style={{ WebkitAppRegion: 'no-drag' } as any}>
+        <div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as any}>
+          {config.replayFolder && (
+            <button
+              onClick={handleRefresh}
+              disabled={loading || indexing}
+              className="flex items-center gap-2 h-9 px-3 rounded-lg text-xs font-orbitron tracking-wider text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 hover:border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Rescan replays and re-index combos"
+            >
+              <RefreshCw size={13} className={`${loading || indexing ? 'animate-spin' : ''}`} />
+              REFRESH
+            </button>
+          )}
+          <nav className="flex gap-1 p-1 rounded-xl bg-slate-900/60 border border-slate-700/20">
           <button
             onClick={() => setActiveTab('library')}
             className={`px-5 py-2 rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 font-orbitron ${
@@ -481,6 +515,7 @@ function App() {
             Setup
           </button>
         </nav>
+        </div>
       </header>
 
       {/* Content */}
