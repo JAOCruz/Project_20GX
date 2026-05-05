@@ -4,7 +4,7 @@ interface Window {
   electron: {
     selectFolder: () => Promise<string | null>
     selectFile: () => Promise<string | null>
-    getConfig: () => Promise<{ dolphinPath: string; replayFolder: string }>
+    getConfig: () => Promise<{ dolphinPath: string; replayFolder: string; unclePunchPath: string }>
     setConfig: (key: string, value: string) => Promise<boolean>
     scanReplays: (folderPath: string) => Promise<{ replays: any[]; total: number; cancelled?: boolean }>
     cancelScan: () => Promise<boolean>
@@ -18,6 +18,7 @@ interface Window {
     removeBookmark: (id: string) => Promise<{ success: boolean }>
     clearBookmarks: () => Promise<{ success: boolean }>
     playBookmarkQueue: () => Promise<{ success: boolean; error?: string }>
+    launchUnclePunch: () => Promise<{ success: boolean; error?: string }>
     onScanProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   }
 }

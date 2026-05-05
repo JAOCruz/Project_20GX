@@ -308,7 +308,8 @@ ipcMain.handle('select-file', async () => {
 
 ipcMain.handle('get-config', () => ({
   dolphinPath: store.get('dolphinPath', ''),
-  replayFolder: store.get('replayFolder', '')
+  replayFolder: store.get('replayFolder', ''),
+  unclePunchPath: store.get('unclePunchPath', '')
 }))
 
 ipcMain.handle('set-config', (_, key: string, value: string) => {
@@ -612,6 +613,54 @@ ipcMain.handle('get-replay-winner', async (_, replayPath: string) => {
   } catch (e) {
     return { winnerPort: null }
   }
+})
+
+ipcMain.handle('launch-uncle-punch', async () => {
+  const dolphinPath = store.get('dolphinPath', '') as string
+  const unclePunchPath = store.get('unclePunchPath', '') as string
+
+  if (!dolphinPath) {
+    return { success: false, error: 'Dolphin path not configured. Go to Settings.' }
+  }
+
+  if (!unclePunchPath) {
+    return { success: false, error: 'Uncle Punch ISO path not configured. Go to Settings.' }
+  }
+
+  if (!fs.existsSync(unclePunchPath)) {
+    return { success: false, error: 'Uncle Punch ISO not found at configured path.' }
+  }
+
+  const playbackDolphin = findPlaybackDolphin(dolphinPath)
+
+  return new Promise((resolve) => {
+    if (process.platform === 'darwin') {
+      const binaryPath = playbackDolphin && playbackDolphin.endsWith('.app')
+        ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
+        : playbackDolphin || dolphinPath
+
+      const cmd = binaryPath && fs.existsSync(binaryPath) && !binaryPath.endsWith('.app')
+        ? `"${binaryPath}" "${unclePunchPath}"`
+        : `open "${dolphinPath}" --args "${unclePunchPath}"`
+
+      exec(cmd, (error) => {
+        if (error) {
+          resolve({ success: false, error: String(error) })
+        } else {
+          resolve({ success: true })
+        }
+      })
+    } else {
+      const exe = playbackDolphin || dolphinPath
+      exec(`"${exe}" "${unclePunchPath}"`, (error) => {
+        if (error) {
+          resolve({ success: false, error: String(error) })
+        } else {
+          resolve({ success: true })
+        }
+      })
+    }
+  })
 })
 
 ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number) => {

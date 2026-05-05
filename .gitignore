@@ -3,3 +3,7 @@ dist
 out
 *.log
 .DS_Store
+
+# ISO files (too large for git)
+*.iso
+Tools/TM-CE.iso

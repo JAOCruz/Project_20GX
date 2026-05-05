@@ -14,7 +14,9 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  Dumbbell,
+  ExternalLink
 } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import ComboSearch from './ComboSearch'
@@ -136,7 +138,7 @@ function Dropdown({ label, value, options, onChange, activeClass = 'cyan' }: Dro
 
 function App() {
   const [activeTab, setActiveTab] = useState<'library' | 'combos' | 'stats' | 'weakness' | 'bookmarks' | 'coach' | 'settings'>('library')
-  const [config, setConfig] = useState({ dolphinPath: '', replayFolder: '' })
+  const [config, setConfig] = useState({ dolphinPath: '', replayFolder: '', unclePunchPath: '' })
   const [replays, setReplays] = useState<Replay[]>([])
   const [loading, setLoading] = useState(false)
   const [indexing, setIndexing] = useState(false)
@@ -242,6 +244,21 @@ function App() {
     if (file) {
       await window.electron.setConfig('dolphinPath', file)
       setConfig((c) => ({ ...c, dolphinPath: file }))
+    }
+  }
+
+  const handleSelectUnclePunch = async () => {
+    const file = await window.electron.selectFile()
+    if (file) {
+      await window.electron.setConfig('unclePunchPath', file)
+      setConfig((c) => ({ ...c, unclePunchPath: file }))
+    }
+  }
+
+  const handleLaunchUnclePunch = async () => {
+    const result = await window.electron.launchUnclePunch()
+    if (!result.success) {
+      alert(result.error)
     }
   }
 
@@ -882,25 +899,68 @@ function App() {
                 )}
               </div>
 
+              <div className="card rounded-xl p-6">
+                <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2 font-orbitron tracking-wider">
+                  <Dumbbell size={15} className="text-orange-400" />
+                  UNCLE PUNCH TRAINING
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-2 tracking-[0.15em] font-orbitron">
+                      UNCLE PUNCH ISO PATH
+                    </label>
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        readOnly
+                        value={config.unclePunchPath}
+                        placeholder="~/Documents/Project_20GX/Tools/TM-CE/TM-CE.iso"
+                        className="flex-1 h-10 px-4 bg-slate-950/50 border border-slate-800 rounded-lg text-sm text-slate-300 font-mono-data focus:outline-none focus:border-cyan-500/20 transition"
+                      />
+                      <button
+                        onClick={handleSelectUnclePunch}
+                        className="h-10 px-5 btn-primary rounded-lg text-xs shrink-0"
+                      >
+                        SELECT ISO
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-700 font-mono-data leading-relaxed">
+                      Select your <span className="text-orange-500/60">TM-CE.iso</span> (Uncle Punch Training Mode). 
+                      This lets you launch training scenarios directly from the app.
+                    </p>
+                  </div>
+
+                  {config.unclePunchPath && (
+                    <button
+                      onClick={handleLaunchUnclePunch}
+                      className="flex items-center gap-2 h-10 px-5 btn-play rounded-lg text-xs"
+                    >
+                      <ExternalLink size={14} />
+                      LAUNCH UNCLE PUNCH
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="panel-soon rounded-xl p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl" />
                 <h3 className="text-sm font-bold text-slate-400 mb-3 font-orbitron tracking-wider relative">Upcoming Modules</h3>
                 <ul className="space-y-2.5 text-sm text-slate-600 font-mono-data relative">
                   <li className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/40" />
-                    Combo search & interaction filtering
+                    Video export to MP4 (ffmpeg + Dolphin frame dumps)
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-500/40" />
-                    Stats dashboard & weakness analysis
+                    Extended Gecko codes (UCF, lag reduction, faster melee settings)
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500/40" />
-                    AI coach integration (Gemini API)
+                    Weakness → curated Uncle Punch event linking
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/40" />
-                    Frame-seeking in Dolphin
+                    Replay annotation & note-taking
                   </li>
                 </ul>
               </div>

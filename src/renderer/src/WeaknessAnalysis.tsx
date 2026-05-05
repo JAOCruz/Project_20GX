@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { AlertTriangle, Shield, Sword, Skull, TrendingDown, Target, Zap, ChevronRight } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, Shield, Sword, Skull, TrendingDown, Target, Zap, ChevronRight, Dumbbell, X } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 
 interface Player {
@@ -34,11 +34,90 @@ const CATEGORY_LABELS: Record<string, { label: string; color: string; icon: Reac
   trade: { label: 'Traded', color: 'text-slate-400', icon: <Shield size={12} /> },
 }
 
+/** Map death categories to Uncle Punch training events */
+const UNCLE_PUNCH_EVENTS: Record<string, { event: string; subEvent: string; tip: string }> = {
+  edgeguard: {
+    event: 'Ledge Options',
+    subEvent: 'Ledge Dash / Sweetspot',
+    tip: 'Drill ledge options against your worst matchup',
+  },
+  'punish-kill': {
+    event: 'DI / Tech Chase',
+    subEvent: 'Survival DI & SDI',
+    tip: 'Work on survival DI to escape kill confirms',
+  },
+  kill: {
+    event: 'DI / Tech Chase',
+    subEvent: 'Survival DI',
+    tip: 'Practice DI to live longer at high percents',
+  },
+  punish: {
+    event: 'DI / Tech Chase',
+    subEvent: 'Combo DI & SDI',
+    tip: 'Work on defensive options out of hitstun',
+  },
+  opening: {
+    event: 'Neutral / Spacing',
+    subEvent: 'Spacing & Approach',
+    tip: 'Review neutral game fundamentals',
+  },
+  combo: {
+    event: 'DI / Tech Chase',
+    subEvent: 'SDI & Combo DI',
+    tip: 'Practice SDI to escape multi-hit combos',
+  },
+  trade: {
+    event: 'Neutral / Spacing',
+    subEvent: 'Spacing & Disjoints',
+    tip: 'Focus on safer spacing in neutral',
+  },
+}
+
+interface TrainingRec {
+  event: string
+  subEvent: string
+  tip: string
+  reason: string
+}
+
+function getTrainingRecommendation(char: any): TrainingRec | null {
+  if (!char.topDeathCauses || char.topDeathCauses.length === 0) return null
+
+  const [topCat] = char.topDeathCauses[0]
+  const mapping = UNCLE_PUNCH_EVENTS[topCat]
+  if (!mapping) return null
+
+  const info = CATEGORY_LABELS[topCat] || { label: topCat }
+  const reason = `${Math.round((char.topDeathCauses[0][1] / Math.max(char.stocksLost, 1)) * 100)}% of stocks lost to ${info.label}`
+
+  return {
+    event: mapping.event,
+    subEvent: mapping.subEvent,
+    tip: mapping.tip,
+    reason,
+  }
+}
+
+function getCoachingTip(char: any): string | null {
+  if (char.winRate < 40) return 'Review neutral game — your win rate is below 40%'
+  if (char.avgDeathDamage < 40) return 'Work on defensive options — dying at very low %'
+  if (char.avgDeathDamage > 80) return 'Work on DI and survival — you live long but still lose'
+
+  const edgeguardPct = char.topDeathCauses.find(([c]: [string, number]) => c === 'edgeguard')
+  if (edgeguardPct && char.stocksLost > 0 && (edgeguardPct[1] / char.stocksLost) > 0.4) {
+    return 'Drill ledge options — over 40% of deaths are offstage'
+  }
+
+  return null
+}
+
 function formatPercent(n: number): string {
   return `${Math.round(n)}%`
 }
 
 function WeaknessAnalysis({ replays }: Props) {
+  const [activeTraining, setActiveTraining] = useState<number | null>(null)
+
   const analysis = useMemo(() => {
     const indexedReplays = replays.filter((r) => r.combos !== null && r.winnerPort !== null)
     if (indexedReplays.length === 0) return null
@@ -147,6 +226,21 @@ function WeaknessAnalysis({ replays }: Props) {
     return result.sort((a, b) => b.games - a.games)
   }, [replays])
 
+  const handleTrain = async (charId: number) => {
+    setActiveTraining(charId)
+    try {
+      const result = await window.electron.launchUnclePunch()
+      if (!result.success) {
+        alert(result.error)
+      }
+    } catch (e) {
+      alert('Failed to launch Uncle Punch. Make sure the ISO path is configured in Settings.')
+    }
+    // Keep the training card open so they can see the recommendation
+  }
+
+  const closeTraining = () => setActiveTraining(null)
+
   if (!analysis || analysis.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-slate-600">
@@ -172,89 +266,148 @@ function WeaknessAnalysis({ replays }: Props) {
 
       <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {analysis.map((char) => (
-            <div key={char.characterId} className="card rounded-xl p-5">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-slate-100 font-orbitron">{char.characterName}</span>
-                  <span className={`text-sm font-mono-data font-bold ${char.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                    {formatPercent(char.winRate)} WR
-                  </span>
-                </div>
-                <span className="text-xs text-slate-600 font-mono-data">{char.games} games</span>
-              </div>
+          {analysis.map((char) => {
+            const trainingRec = getTrainingRecommendation(char)
+            const coachingTip = getCoachingTip(char)
+            const isTrainingOpen = activeTraining === char.characterId
 
-              {/* Stats row */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
-                  <span className="text-lg font-bold text-green-400 font-orbitron">{char.wins}</span>
-                  <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">WINS</p>
+            return (
+              <div key={char.characterId} className="card rounded-xl p-5">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-bold text-slate-100 font-orbitron">{char.characterName}</span>
+                    <span className={`text-sm font-mono-data font-bold ${char.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                      {formatPercent(char.winRate)} WR
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-600 font-mono-data">{char.games} games</span>
                 </div>
-                <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
-                  <span className="text-lg font-bold text-red-400 font-orbitron">{char.losses}</span>
-                  <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">LOSSES</p>
-                </div>
-                <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
-                  <span className="text-lg font-bold text-purple-400 font-orbitron">{Math.round(char.avgDeathDamage)}%</span>
-                  <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">AVG DEATH</p>
-                </div>
-              </div>
 
-              {/* Death causes */}
-              {char.topDeathCauses.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-2">HOW YOU DIE</p>
-                  <div className="space-y-1.5">
-                    {char.topDeathCauses.map(([cat, count]) => {
-                      const info = CATEGORY_LABELS[cat] || { label: cat, color: 'text-slate-400', icon: <Skull size={12} /> }
-                      const pct = char.stocksLost > 0 ? Math.round((count / char.stocksLost) * 100) : 0
-                      return (
-                        <div key={cat} className="flex items-center gap-2">
-                          <span className={`flex items-center gap-1 text-xs ${info.color}`}>
-                            {info.icon}
-                            {info.label}
-                          </span>
-                          <div className="flex-1 h-1.5 bg-slate-800/50 rounded-full overflow-hidden">
-                            <div className="h-full bg-red-500/40 rounded-full" style={{ width: `${pct}%` }} />
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
+                    <span className="text-lg font-bold text-green-400 font-orbitron">{char.wins}</span>
+                    <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">WINS</p>
+                  </div>
+                  <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
+                    <span className="text-lg font-bold text-red-400 font-orbitron">{char.losses}</span>
+                    <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">LOSSES</p>
+                  </div>
+                  <div className="bg-slate-950/30 rounded-lg p-2.5 text-center">
+                    <span className="text-lg font-bold text-purple-400 font-orbitron">{Math.round(char.avgDeathDamage)}%</span>
+                    <p className="text-[10px] text-slate-600 font-mono-data mt-0.5">AVG DEATH</p>
+                  </div>
+                </div>
+
+                {/* Coaching tip */}
+                {coachingTip && (
+                  <div className="mb-3 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/10">
+                    <p className="text-[11px] text-orange-300 font-mono-data leading-relaxed">
+                      <span className="font-bold">TIP:</span> {coachingTip}
+                    </p>
+                  </div>
+                )}
+
+                {/* Death causes */}
+                {char.topDeathCauses.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-2">HOW YOU DIE</p>
+                    <div className="space-y-1.5">
+                      {char.topDeathCauses.map(([cat, count]) => {
+                        const info = CATEGORY_LABELS[cat] || { label: cat, color: 'text-slate-400', icon: <Skull size={12} /> }
+                        const pct = char.stocksLost > 0 ? Math.round((count / char.stocksLost) * 100) : 0
+                        return (
+                          <div key={cat} className="flex items-center gap-2">
+                            <span className={`flex items-center gap-1 text-xs ${info.color}`}>
+                              {info.icon}
+                              {info.label}
+                            </span>
+                            <div className="flex-1 h-1.5 bg-slate-800/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-red-500/40 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono-data w-8 text-right">{pct}%</span>
                           </div>
-                          <span className="text-[10px] text-slate-500 font-mono-data w-8 text-right">{pct}%</span>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Worst matchup / stage */}
-              <div className="flex gap-3">
-                {char.worstMatchup && (
-                  <div className="flex-1 bg-slate-950/30 rounded-lg p-2.5">
-                    <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-1">WORST MATCHUP</p>
-                    <div className="flex items-center gap-1.5">
-                      <TrendingDown size={12} className="text-red-400" />
-                      <span className="text-sm font-bold text-slate-200">
-                        vs {CHARACTERS[char.worstMatchup.charId] || 'Unknown'}
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-mono-data">({char.worstMatchup.count} losses)</span>
-                    </div>
+                {/* Training recommendation */}
+                {trainingRec && (
+                  <div className="mb-3">
+                    {isTrainingOpen ? (
+                      <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Dumbbell size={14} className="text-orange-400" />
+                            <span className="text-xs font-bold text-orange-300 font-orbitron">UNCLE PUNCH TRAINING</span>
+                          </div>
+                          <button
+                            onClick={closeTraining}
+                            className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-300 transition"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-slate-300 font-mono-data">
+                            Event: <span className="text-orange-300 font-bold">{trainingRec.event}</span>
+                          </p>
+                          <p className="text-xs text-slate-400 font-mono-data">
+                            Focus: <span className="text-slate-200">{trainingRec.subEvent}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500 font-mono-data leading-relaxed">
+                            {trainingRec.reason}. {trainingRec.tip}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-[10px] text-slate-600 font-mono-data">
+                          Uncle Punch launched. Select the event from the in-game menu.
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleTrain(char.characterId)}
+                        className="w-full flex items-center justify-center gap-2 h-9 px-4 rounded-lg text-xs font-orbitron tracking-wider bg-orange-500/5 text-orange-400 border border-orange-500/20 hover:bg-orange-500/10 hover:border-orange-500/30 transition"
+                      >
+                        <Dumbbell size={13} />
+                        TRAIN THIS — {trainingRec.event.toUpperCase()}
+                      </button>
+                    )}
                   </div>
                 )}
-                {char.worstStage && (
-                  <div className="flex-1 bg-slate-950/30 rounded-lg p-2.5">
-                    <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-1">WORST STAGE</p>
-                    <div className="flex items-center gap-1.5">
-                      <ChevronRight size={12} className="text-orange-400" />
-                      <span className="text-sm font-bold text-slate-200">
-                        {STAGES[char.worstStage.stageId] || 'Unknown'}
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-mono-data">({char.worstStage.count} losses)</span>
+
+                {/* Worst matchup / stage */}
+                <div className="flex gap-3">
+                  {char.worstMatchup && (
+                    <div className="flex-1 bg-slate-950/30 rounded-lg p-2.5">
+                      <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-1">WORST MATCHUP</p>
+                      <div className="flex items-center gap-1.5">
+                        <TrendingDown size={12} className="text-red-400" />
+                        <span className="text-sm font-bold text-slate-200">
+                          vs {CHARACTERS[char.worstMatchup.charId] || 'Unknown'}
+                        </span>
+                        <span className="text-[10px] text-slate-600 font-mono-data">({char.worstMatchup.count} losses)</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {char.worstStage && (
+                    <div className="flex-1 bg-slate-950/30 rounded-lg p-2.5">
+                      <p className="text-[10px] font-orbitron tracking-wider text-slate-500 mb-1">WORST STAGE</p>
+                      <div className="flex items-center gap-1.5">
+                        <ChevronRight size={12} className="text-orange-400" />
+                        <span className="text-sm font-bold text-slate-200">
+                          {STAGES[char.worstStage.stageId] || 'Unknown'}
+                        </span>
+                        <span className="text-[10px] text-slate-600 font-mono-data">({char.worstStage.count} losses)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
