@@ -1,0 +1,240 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Softer slate-based dark theme instead of pure black */
+    --bg-primary: #0b0f19;
+    --bg-secondary: #111827;
+    --bg-card: #151d2e;
+    --bg-hover: #1e293b;
+    --bg-input: #0f172a;
+
+    /* Accents - vibrant but used sparingly */
+    --accent-cyan: #22d3ee;
+    --accent-cyan-glow: rgba(34, 211, 238, 0.15);
+    --accent-pink: #f472b6;
+    --accent-pink-glow: rgba(244, 114, 182, 0.15);
+    --accent-purple: #c084fc;
+    --accent-green: #4ade80;
+    --accent-green-glow: rgba(74, 222, 128, 0.15);
+    --accent-yellow: #facc15;
+
+    /* Text - soft and readable, not neon */
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-dim: #64748b;
+    --text-muted: #475569;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -webkit-app-region: no-drag;
+  }
+
+  /* Ultra subtle grid - barely visible */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(34, 211, 238, 0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+@layer components {
+  .font-orbitron {
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  .font-mono-data {
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* Accent glows ONLY for decorative elements, never body text */
+  .glow-cyan {
+    box-shadow: 0 0 20px var(--accent-cyan-glow), 0 0 40px rgba(34, 211, 238, 0.05);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 20px var(--accent-pink-glow), 0 0 40px rgba(244, 114, 182, 0.05);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px var(--accent-green-glow), 0 0 40px rgba(74, 222, 128, 0.05);
+  }
+
+  /* Cards - softer, more Slippi-like */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid rgba(148, 163, 184, 0.08);
+    transition: all 0.2s ease;
+  }
+
+  .card:hover {
+    background: var(--bg-hover);
+    border-color: rgba(34, 211, 238, 0.15);
+  }
+
+  /* Primary action button - cyan */
+  .btn-primary {
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    color: var(--accent-cyan);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background: rgba(34, 211, 238, 0.18);
+    border-color: rgba(34, 211, 238, 0.5);
+    box-shadow: 0 0 20px var(--accent-cyan-glow);
+  }
+
+  /* Play button - green */
+  .btn-play {
+    background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    color: var(--accent-green);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: all 0.2s ease;
+  }
+
+  .btn-play:hover {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 20px var(--accent-green-glow);
+  }
+
+  /* Tab active state */
+  .tab-active {
+    background: rgba(34, 211, 238, 0.08);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    color: var(--accent-cyan);
+  }
+
+  /* Inputs */
+  .input-dark {
+    background: var(--bg-input);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+  }
+
+  .input-dark:focus {
+    border-color: rgba(34, 211, 238, 0.35);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.05);
+    outline: none;
+  }
+
+  .input-dark::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Filter pills - character (cyan) */
+  .pill-cyan {
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.12);
+    color: rgba(34, 211, 238, 0.7);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    transition: all 0.15s ease;
+  }
+
+  .pill-cyan:hover {
+    background: rgba(34, 211, 238, 0.1);
+    border-color: rgba(34, 211, 238, 0.3);
+    color: var(--accent-cyan);
+  }
+
+  .pill-cyan-active {
+    background: rgba(34, 211, 238, 0.15);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.1);
+  }
+
+  /* Filter pills - stage (pink) */
+  .pill-pink {
+    background: rgba(244, 114, 182, 0.06);
+    border: 1px solid rgba(244, 114, 182, 0.12);
+    color: rgba(244, 114, 182, 0.7);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    transition: all 0.15s ease;
+  }
+
+  .pill-pink:hover {
+    background: rgba(244, 114, 182, 0.1);
+    border-color: rgba(244, 114, 182, 0.3);
+    color: var(--accent-pink);
+  }
+
+  .pill-pink-active {
+    background: rgba(244, 114, 182, 0.15);
+    border: 1px solid rgba(244, 114, 182, 0.4);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(244, 114, 182, 0.1);
+  }
+
+  /* Badge - stage tag */
+  .badge-stage {
+    background: rgba(192, 132, 252, 0.08);
+    border: 1px solid rgba(192, 132, 252, 0.15);
+    color: rgba(192, 132, 252, 0.85);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  /* Badge - code/tag */
+  .badge-mono {
+    background: rgba(34, 211, 238, 0.06);
+    border: 1px solid rgba(34, 211, 238, 0.1);
+    color: rgba(34, 211, 238, 0.6);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* Coming soon panel */
+  .panel-soon {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.02) 0%, rgba(192, 132, 252, 0.02) 100%);
+    border: 1px solid rgba(34, 211, 238, 0.06);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
