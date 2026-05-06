@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb } from 'lucide-react'
+import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb, RefreshCw } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName, getSearchableMoves, formatComboString } from './moves'
 
@@ -112,6 +112,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [expandedGame, setExpandedGame] = useState<string | null>(null)
   const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
+  const [scope, setScope] = useState<number>(7) // default: this week
 
   // Extract all conversions from all replays
   const allConversions = useMemo(() => {
@@ -251,6 +252,10 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
     setExpandedGame(null)
   }
 
+  const handleScopeIndex = () => {
+    onIndexCombos(scope > 0 ? scope : undefined)
+  }
+
   const hasFilters = charFilter !== null || opponentFilter !== null || stageFilter !== null || categoryFilter !== 'all' || moveSequence.some((m) => m !== -1) || minDamage > 0 || showAll || searchTerm !== '' || tagFilter !== ''
 
   const totalKills = allConversions.filter((c) => c.didKill).length
@@ -263,6 +268,32 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
       {/* Filter bar */}
       <div className="px-6 py-3 border-b border-slate-800/50 shrink-0">
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Scope selector + refresh */}
+          <div className="flex items-center gap-2">
+            <Database size={14} className="text-purple-500/60" />
+            <span className="text-xs font-orbitron tracking-wider text-slate-500">SCOPE</span>
+            <select
+              value={scope}
+              onChange={(e) => setScope(Number(e.target.value))}
+              className="h-9 px-3 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-purple-500/30"
+            >
+              <option value={1}>Today</option>
+              <option value={7}>This Week</option>
+              <option value={30}>This Month</option>
+              <option value={0}>All Games</option>
+            </select>
+            <button
+              onClick={handleScopeIndex}
+              disabled={indexing}
+              className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-orbitron tracking-wider text-purple-400 hover:text-purple-300 border border-purple-500/20 hover:border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={12} className={indexing ? 'animate-spin' : ''} />
+              {indexing ? 'INDEXING...' : 'INDEX'}
+            </button>
+          </div>
+
+          <div className="w-px h-6 bg-slate-800/50" />
+
           <div className="flex items-center gap-2">
             <Sword size={14} className="text-cyan-500/60" />
             <span className="text-xs font-orbitron tracking-wider text-slate-500">CHAR</span>
@@ -466,7 +497,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
             <div className="flex items-center gap-2 mt-4">
               {dateStats.today > 0 && (
                 <button
-                  onClick={() => onIndexCombos(1)}
+                  onClick={() => { setScope(1); onIndexCombos(1) }}
                   className="flex items-center gap-2 h-10 px-4 btn-primary rounded-lg text-xs"
                 >
                   <Zap size={13} />
@@ -476,7 +507,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
               )}
               {dateStats.thisWeek > 0 && (
                 <button
-                  onClick={() => onIndexCombos(7)}
+                  onClick={() => { setScope(7); onIndexCombos(7) }}
                   className={`flex items-center gap-2 h-10 px-4 rounded-lg text-xs transition ${
                     dateStats.today > 0
                       ? 'bg-slate-800/40 border border-slate-700/50 hover:border-cyan-500/30 text-slate-300'
@@ -490,7 +521,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
               )}
               {dateStats.thisMonth > 0 && (
                 <button
-                  onClick={() => onIndexCombos(30)}
+                  onClick={() => { setScope(30); onIndexCombos(30) }}
                   className="flex items-center gap-2 h-10 px-4 bg-slate-800/40 border border-slate-700/50 hover:border-cyan-500/30 text-slate-300 rounded-lg text-xs transition"
                 >
                   <Calendar size={13} />

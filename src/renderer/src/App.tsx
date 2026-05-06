@@ -269,19 +269,14 @@ function App() {
       return
     }
     setLoading(true)
-    setIndexing(true)
     setError('')
     try {
       const scanResult = await window.electron.scanReplays(config.replayFolder)
       setReplays(scanResult.replays)
-      await window.electron.indexCombos()
-      const indexResult = await window.electron.scanReplays(config.replayFolder)
-      setReplays(indexResult.replays)
     } catch (e) {
       setError('Refresh failed')
     }
     setLoading(false)
-    setIndexing(false)
   }
 
   const loadTrainingMods = async () => {
