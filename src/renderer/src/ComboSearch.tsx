@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb, RefreshCw } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName, getSearchableMoves, formatComboString } from './moves'
@@ -115,8 +115,28 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
   const [trainingCodes, setTrainingCodes] = useState<{ id: string; name: string; enabled: boolean }[]>([])
 
+  const codesLoadedRef = useRef(false)
+
   useEffect(() => {
     loadTrainingCodes()
+
+    // Retry loading training codes if Dolphin was just configured in another tab
+    const interval = setInterval(() => {
+      if (!codesLoadedRef.current) {
+        loadTrainingCodes()
+      } else {
+        clearInterval(interval)
+      }
+    }, 2000)
+
+    const onVisible = () => {
+      if (!document.hidden) loadTrainingCodes()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   const loadTrainingCodes = async () => {
@@ -124,6 +144,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
       const result = await window.electron.getTrainingMods()
       if (result.available && result.codes) {
         setTrainingCodes(result.codes)
+        codesLoadedRef.current = true
       }
     } catch (e) {
       console.error('Failed to load training codes:', e)
