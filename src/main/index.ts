@@ -181,44 +181,42 @@ function findPlaybackDolphin(launcherPath: string): string | null {
   return null
 }
 
-/** Return all candidate GALE01.ini paths for the current platform */
-function getGale01IniCandidates(dolphinPath: string): string[] {
+/** Return all candidate GALE01.ini / GALE01r2.ini paths for the current platform */
+function getGale01IniPaths(dolphinPath: string): string[] {
   if (process.platform === 'darwin') {
     const home = process.env.HOME
-    return [
-      path.join(home!, 'Library/Application Support/Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
-      path.join(home!, 'Library/Application Support/Dolphin/User/GameSettings/GALE01.ini'),
-      path.join(home!, 'Library/Application Support/Slippi Dolphin/User/GameSettings/GALE01.ini'),
-      dolphinPath.endsWith('.app') ? path.join(dolphinPath, 'Contents/Resources/User/GameSettings/GALE01.ini') : null,
-    ].filter(Boolean) as string[]
+    const bases = [
+      path.join(home!, 'Library/Application Support/Slippi Launcher/playback/User/GameSettings'),
+      path.join(home!, 'Library/Application Support/Dolphin/User/GameSettings'),
+      path.join(home!, 'Library/Application Support/Slippi Dolphin/User/GameSettings'),
+    ]
+    const result: string[] = []
+    for (const base of bases) {
+      // Slippi often uses GALE01r2.ini for Melee 1.02, check that first
+      result.push(path.join(base, 'GALE01r2.ini'))
+      result.push(path.join(base, 'GALE01.ini'))
+    }
+    return result
   } else if (process.platform === 'win32') {
     const appData = process.env.APPDATA
-    return [
-      path.join(appData!, 'Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
-      path.join(path.dirname(dolphinPath), 'User/GameSettings/GALE01.ini'),
+    const bases = [
+      path.join(appData!, 'Slippi Launcher/playback/User/GameSettings'),
+      path.join(path.dirname(dolphinPath), 'User/GameSettings'),
     ]
+    const result: string[] = []
+    for (const base of bases) {
+      result.push(path.join(base, 'GALE01r2.ini'))
+      result.push(path.join(base, 'GALE01.ini'))
+    }
+    return result
   }
   return []
 }
 
-/** Find GALE01.ini path given a Dolphin binary/app path */
+/** Find the first existing GALE01.ini / GALE01r2.ini path */
 function findGale01Ini(dolphinPath: string): string | null {
-  const candidates = getGale01IniCandidates(dolphinPath)
-
-  for (const p of candidates) {
+  for (const p of getGale01IniPaths(dolphinPath)) {
     if (fs.existsSync(p)) return p
-  }
-
-  // Nothing found — auto-create in the most common location so overlays work
-  if (candidates.length > 0) {
-    const autoCreatePath = candidates[0]
-    try {
-      fs.mkdirSync(path.dirname(autoCreatePath), { recursive: true })
-      fs.writeFileSync(autoCreatePath, '[Gecko]\n\n[Gecko_Enabled]\n')
-      return autoCreatePath
-    } catch (e) {
-      console.error('Failed to auto-create GALE01.ini:', e)
-    }
   }
   return null
 }
@@ -239,13 +237,13 @@ function createSlippiCommFile(replayPath: string, startFrame?: number, endFrame?
 
   if (startFrame !== undefined) {
     // Start ~1 second before the combo so you see the setup
-    const adjustedFrame = Math.max(-123, startFrame - 60)
+    const adjustedFrame = Math.max(-123, Math.floor(startFrame) - 60)
     data.startFrame = adjustedFrame
   }
 
   if (typeof endFrame === 'number' && !isNaN(endFrame)) {
     // Stop shortly after the combo ends
-    data.endFrame = endFrame + 30
+    data.endFrame = Math.floor(endFrame) + 30
   }
 
   fs.writeFileSync(commPath, JSON.stringify(data, null, 2))
@@ -336,13 +334,10 @@ function injectCodeDefinition(lines: string[], codeDef: TrainingCodeDef): void {
 /** Apply a single code toggle to one GALE01.ini file */
 function applyCodeToggleToFile(iniPath: string, codeDef: TrainingCodeDef, enabled: boolean): boolean {
   try {
-    let content = ''
-    if (fs.existsSync(iniPath)) {
-      content = fs.readFileSync(iniPath, 'utf-8')
-    } else {
-      content = '[Gecko]\n'
+    if (!fs.existsSync(iniPath)) {
+      return false
     }
-
+    const content = fs.readFileSync(iniPath, 'utf-8')
     const lines = content.split(/\r?\n/)
 
     // Ensure code definition exists in [Gecko] before enabling
@@ -389,8 +384,10 @@ function applyCodeToggleToFile(iniPath: string, codeDef: TrainingCodeDef, enable
       }
     }
 
-    if (fs.existsSync(iniPath)) {
-      fs.writeFileSync(iniPath + '.backup', content)
+    // Only backup the ORIGINAL file once — never overwrite backup with already-modified content
+    const backupPath = iniPath + '.backup'
+    if (!fs.existsSync(backupPath)) {
+      fs.writeFileSync(backupPath, content)
     }
 
     fs.writeFileSync(iniPath, lines.join('\n'))
@@ -401,29 +398,15 @@ function applyCodeToggleToFile(iniPath: string, codeDef: TrainingCodeDef, enable
   }
 }
 
-/** Toggle a training code on/off in ALL GALE01.ini files */
+/** Toggle a training code on/off in the ONE existing GALE01.ini / GALE01r2.ini file */
 function setTrainingCodeEnabled(dolphinPath: string, codeId: string, enabled: boolean): boolean {
   const codeDef = TRAINING_CODES.find((c) => c.id === codeId)
   if (!codeDef) return false
 
-  const candidates = getGale01IniCandidates(dolphinPath)
-  let anySuccess = false
+  const iniPath = findGale01Ini(dolphinPath)
+  if (!iniPath) return false
 
-  for (const iniPath of candidates) {
-    // Ensure file exists before we try to toggle
-    if (!fs.existsSync(iniPath)) {
-      try {
-        fs.mkdirSync(path.dirname(iniPath), { recursive: true })
-        fs.writeFileSync(iniPath, '[Gecko]\n\n[Gecko_Enabled]\n')
-      } catch (e) {
-        continue
-      }
-    }
-    const ok = applyCodeToggleToFile(iniPath, codeDef, enabled)
-    if (ok) anySuccess = true
-  }
-
-  return anySuccess
+  return applyCodeToggleToFile(iniPath, codeDef, enabled)
 }
 
 let cancelScanFlag = false
@@ -977,7 +960,7 @@ ipcMain.handle('get-training-mods', async () => {
 
   const iniPath = findGale01Ini(playbackDolphin)
   if (!iniPath) {
-    return { available: false, error: 'GALE01.ini not found', codes: [] }
+    return { available: false, error: 'GALE01.ini / GALE01r2.ini not found. Launch Slippi Dolphin once to generate it.', codes: [] }
   }
 
   const enabledIds = getEnabledTrainingCodes(iniPath)
