@@ -181,51 +181,40 @@ function findPlaybackDolphin(launcherPath: string): string | null {
   return null
 }
 
-/** Find GALE01.ini path given a Dolphin binary/app path */
-function findGale01Ini(dolphinPath: string): string | null {
+/** Return all candidate GALE01.ini paths for the current platform */
+function getGale01IniCandidates(dolphinPath: string): string[] {
   if (process.platform === 'darwin') {
     const home = process.env.HOME
-    const candidates = [
-      // Slippi Launcher playback Dolphin (most common)
+    return [
       path.join(home!, 'Library/Application Support/Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
-      // Standalone Slippi Dolphin
       path.join(home!, 'Library/Application Support/Dolphin/User/GameSettings/GALE01.ini'),
       path.join(home!, 'Library/Application Support/Slippi Dolphin/User/GameSettings/GALE01.ini'),
-      // Inside .app bundle (read-only fallback, last resort)
       dolphinPath.endsWith('.app') ? path.join(dolphinPath, 'Contents/Resources/User/GameSettings/GALE01.ini') : null,
     ].filter(Boolean) as string[]
-
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p
-    }
-
-    // Nothing found — auto-create in the most common location so overlays work
-    const autoCreatePath = candidates[0]
-    try {
-      fs.mkdirSync(path.dirname(autoCreatePath), { recursive: true })
-      fs.writeFileSync(autoCreatePath, '[Gecko]\n\n[Gecko_Enabled]\n')
-      console.log('Auto-created GALE01.ini at:', autoCreatePath)
-      return autoCreatePath
-    } catch (e) {
-      console.error('Failed to auto-create GALE01.ini:', e)
-    }
   } else if (process.platform === 'win32') {
     const appData = process.env.APPDATA
-    const candidates = [
+    return [
       path.join(appData!, 'Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
       path.join(path.dirname(dolphinPath), 'User/GameSettings/GALE01.ini'),
     ]
+  }
+  return []
+}
 
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p
-    }
+/** Find GALE01.ini path given a Dolphin binary/app path */
+function findGale01Ini(dolphinPath: string): string | null {
+  const candidates = getGale01IniCandidates(dolphinPath)
 
-    // Auto-create
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p
+  }
+
+  // Nothing found — auto-create in the most common location so overlays work
+  if (candidates.length > 0) {
     const autoCreatePath = candidates[0]
     try {
       fs.mkdirSync(path.dirname(autoCreatePath), { recursive: true })
       fs.writeFileSync(autoCreatePath, '[Gecko]\n\n[Gecko_Enabled]\n')
-      console.log('Auto-created GALE01.ini at:', autoCreatePath)
       return autoCreatePath
     } catch (e) {
       console.error('Failed to auto-create GALE01.ini:', e)
@@ -344,17 +333,13 @@ function injectCodeDefinition(lines: string[], codeDef: TrainingCodeDef): void {
   lines.splice(insertIndex, 0, ...block)
 }
 
-/** Toggle a training code on/off in GALE01.ini */
-function setTrainingCodeEnabled(iniPath: string, codeId: string, enabled: boolean): boolean {
+/** Apply a single code toggle to one GALE01.ini file */
+function applyCodeToggleToFile(iniPath: string, codeDef: TrainingCodeDef, enabled: boolean): boolean {
   try {
-    const codeDef = TRAINING_CODES.find((c) => c.id === codeId)
-    if (!codeDef) return false
-
     let content = ''
     if (fs.existsSync(iniPath)) {
       content = fs.readFileSync(iniPath, 'utf-8')
     } else {
-      // Create minimal INI if it doesn't exist
       content = '[Gecko]\n'
     }
 
@@ -389,26 +374,21 @@ function setTrainingCodeEnabled(iniPath: string, codeId: string, enabled: boolea
     }
 
     if (enabled) {
-      // Add to enabled section if not there
       if (codeLineIndex === -1) {
         if (enabledSectionIndex === -1) {
-          // No [Gecko_Enabled] section exists — append one
           lines.push('')
           lines.push('[Gecko_Enabled]')
           lines.push('$' + codeDef.name)
         } else {
-          // Insert after the section header
           lines.splice(enabledSectionIndex + 1, 0, '$' + codeDef.name)
         }
       }
     } else {
-      // Remove from enabled section
       if (codeLineIndex !== -1) {
         lines.splice(codeLineIndex, 1)
       }
     }
 
-    // Backup original
     if (fs.existsSync(iniPath)) {
       fs.writeFileSync(iniPath + '.backup', content)
     }
@@ -416,9 +396,34 @@ function setTrainingCodeEnabled(iniPath: string, codeId: string, enabled: boolea
     fs.writeFileSync(iniPath, lines.join('\n'))
     return true
   } catch (e) {
-    console.error('Failed to toggle training code:', e)
+    console.error('Failed to toggle training code in', iniPath, e)
     return false
   }
+}
+
+/** Toggle a training code on/off in ALL GALE01.ini files */
+function setTrainingCodeEnabled(dolphinPath: string, codeId: string, enabled: boolean): boolean {
+  const codeDef = TRAINING_CODES.find((c) => c.id === codeId)
+  if (!codeDef) return false
+
+  const candidates = getGale01IniCandidates(dolphinPath)
+  let anySuccess = false
+
+  for (const iniPath of candidates) {
+    // Ensure file exists before we try to toggle
+    if (!fs.existsSync(iniPath)) {
+      try {
+        fs.mkdirSync(path.dirname(iniPath), { recursive: true })
+        fs.writeFileSync(iniPath, '[Gecko]\n\n[Gecko_Enabled]\n')
+      } catch (e) {
+        continue
+      }
+    }
+    const ok = applyCodeToggleToFile(iniPath, codeDef, enabled)
+    if (ok) anySuccess = true
+  }
+
+  return anySuccess
 }
 
 let cancelScanFlag = false
@@ -999,12 +1004,7 @@ ipcMain.handle('set-training-mod', async (_, codeId: string, enabled: boolean) =
     return { success: false, error: 'Playback Dolphin not found' }
   }
 
-  const iniPath = findGale01Ini(playbackDolphin)
-  if (!iniPath) {
-    return { success: false, error: 'GALE01.ini not found' }
-  }
-
-  const ok = setTrainingCodeEnabled(iniPath, codeId, enabled)
+  const ok = setTrainingCodeEnabled(playbackDolphin, codeId, enabled)
   return { success: ok }
 })
 
