@@ -112,6 +112,33 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [expandedGame, setExpandedGame] = useState<string | null>(null)
   const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
+  const [trainingCodes, setTrainingCodes] = useState<{ id: string; name: string; enabled: boolean }[]>([])
+
+  useEffect(() => {
+    loadTrainingCodes()
+  }, [])
+
+  const loadTrainingCodes = async () => {
+    try {
+      const result = await window.electron.getTrainingMods()
+      if (result.available && result.codes) {
+        setTrainingCodes(result.codes)
+      }
+    } catch (e) {
+      console.error('Failed to load training codes:', e)
+    }
+  }
+
+  const toggleTrainingCode = async (codeId: string, enabled: boolean) => {
+    try {
+      const result = await window.electron.setTrainingMod(codeId, enabled)
+      if (result.success) {
+        setTrainingCodes((prev) => prev.map((c) => (c.id === codeId ? { ...c, enabled } : c)))
+      }
+    } catch (e) {
+      console.error('Failed to toggle training code:', e)
+    }
+  }
   const [scope, setScope] = useState<number>(7) // default: this week
   const [perspective, setPerspective] = useState<'aggressor' | 'victim' | 'both'>('both')
 
@@ -731,6 +758,43 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                 PLAY
                               </button>
                             </div>
+
+                            {/* Training overlays */}
+                            {trainingCodes.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="text-[10px] font-orbitron tracking-wider text-slate-600">OVERLAYS</span>
+                                {trainingCodes.map((code) => (
+                                  <button
+                                    key={code.id}
+                                    onClick={() => toggleTrainingCode(code.id, !code.enabled)}
+                                    title={code.name}
+                                    className={`w-5 h-5 rounded border transition ${
+                                      code.enabled
+                                        ? code.id === 'actionable-green'
+                                          ? 'bg-green-500/40 border-green-500/60'
+                                          : code.id === 'lcancel-red'
+                                          ? 'bg-red-500/40 border-red-500/60'
+                                          : code.id === 'iasa-yellow'
+                                          ? 'bg-yellow-500/40 border-yellow-500/60'
+                                          : 'bg-cyan-500/40 border-cyan-500/60'
+                                        : 'bg-slate-800/40 border-slate-700/30 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full mx-auto ${
+                                      code.enabled
+                                        ? code.id === 'actionable-green'
+                                          ? 'bg-green-400'
+                                          : code.id === 'lcancel-red'
+                                          ? 'bg-red-400'
+                                          : code.id === 'iasa-yellow'
+                                          ? 'bg-yellow-400'
+                                          : 'bg-cyan-400'
+                                        : 'bg-slate-600'
+                                    }`} />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {/* Missed opportunities analysis */}
