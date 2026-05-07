@@ -927,8 +927,8 @@ function App() {
                         <span className="text-xs text-slate-300 font-mono-data">{code.name}</span>
                       </label>
                     ))}
-                    <p className="text-xs text-slate-700 font-mono-data mt-2">
-                      Code definitions are auto-injected into GALE01.ini if missing. Changes apply on next replay launch. A backup is created automatically.
+                    <p className="text-xs text-orange-400/70 font-mono-data mt-2">
+                      ⚠️ Fully quit Dolphin (Cmd+Q) before clicking PLAY — Dolphin only reads Gecko codes at startup.
                     </p>
                   </div>
                 )}

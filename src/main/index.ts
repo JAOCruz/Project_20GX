@@ -961,19 +961,16 @@ ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number,
 
 ipcMain.handle('get-training-mods', async () => {
   const dolphinPath = store.get('dolphinPath', '') as string
-  console.log('[get-training-mods] dolphinPath:', dolphinPath)
   if (!dolphinPath) {
     return { available: false, error: 'Dolphin path not configured', codes: [] }
   }
 
   const playbackDolphin = findPlaybackDolphin(dolphinPath)
-  console.log('[get-training-mods] playbackDolphin:', playbackDolphin)
   if (!playbackDolphin) {
     return { available: false, error: 'Playback Dolphin not found. Please select Slippi Dolphin or Slippi Launcher.', codes: [] }
   }
 
   const iniPath = findGale01Ini(playbackDolphin)
-  console.log('[get-training-mods] iniPath:', iniPath)
   if (!iniPath) {
     return { available: false, error: 'GALE01.ini not found', codes: [] }
   }
@@ -993,36 +990,21 @@ ipcMain.handle('get-training-mods', async () => {
 
 ipcMain.handle('set-training-mod', async (_, codeId: string, enabled: boolean) => {
   const dolphinPath = store.get('dolphinPath', '') as string
-  console.log('[set-training-mod] codeId:', codeId, 'enabled:', enabled, 'dolphinPath:', dolphinPath)
   if (!dolphinPath) {
     return { success: false, error: 'Dolphin path not configured' }
   }
 
   const playbackDolphin = findPlaybackDolphin(dolphinPath)
-  console.log('[set-training-mod] playbackDolphin:', playbackDolphin)
   if (!playbackDolphin) {
     return { success: false, error: 'Playback Dolphin not found' }
   }
 
   const iniPath = findGale01Ini(playbackDolphin)
-  console.log('[set-training-mod] iniPath:', iniPath)
   if (!iniPath) {
     return { success: false, error: 'GALE01.ini not found' }
   }
 
   const ok = setTrainingCodeEnabled(iniPath, codeId, enabled)
-  console.log('[set-training-mod] setTrainingCodeEnabled result:', ok)
-
-  // Verify the file looks correct
-  try {
-    const after = fs.readFileSync(iniPath, 'utf-8')
-    const hasDef = after.includes('$' + TRAINING_CODES.find(c => c.id === codeId)?.name)
-    const hasEnabled = after.includes('[Gecko_Enabled]')
-    console.log('[set-training-mod] post-write check — hasDef:', hasDef, 'hasEnabled:', hasEnabled)
-  } catch (e) {
-    console.error('[set-training-mod] post-write verification failed:', e)
-  }
-
   return { success: ok }
 })
 
