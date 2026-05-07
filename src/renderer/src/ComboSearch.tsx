@@ -691,28 +691,28 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                   </span>
                                 )}
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700/50 font-mono-data">
-                                  Frame {conv.startFrame.toLocaleString()}
+                                  Frame {(conv.startFrame ?? 0).toLocaleString()}
                                 </span>
                               </div>
 
                               {/* Move chain */}
                               <div className="text-base text-slate-300 leading-relaxed">
-                                {formatComboString(conv.playerCharacter ?? 0, conv.moves)}
+                                {formatComboString(conv.playerCharacter ?? 0, conv.moves ?? [])}
                               </div>
 
                               {/* Damage + meta — damage is now prominent */}
                               <div className="flex items-center gap-3 mt-1.5">
                                 <span className="text-sm font-mono-data font-bold text-purple-400">
-                                  {Math.round(conv.damage)}%
+                                  {Math.round(conv.damage ?? 0)}%
                                   <span className="font-normal text-slate-600 ml-1">
-                                    ({Math.round(conv.startPercent)}% → {Math.round(conv.endPercent)}%)
+                                    ({Math.round(conv.startPercent ?? 0)}% → {Math.round(conv.endPercent ?? 0)}%)
                                   </span>
                                 </span>
                                 <span className="text-sm font-mono-data text-slate-600">
-                                  {conv.moves.length} hits
+                                  {(conv.moves ?? []).length} hits
                                 </span>
                                 <span className="text-sm font-mono-data text-slate-600">
-                                  {conv.endFrame - conv.startFrame}f
+                                  {((conv.endFrame ?? 0) - (conv.startFrame ?? 0))}f
                                 </span>
                               </div>
                             </div>
@@ -751,7 +751,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                 <Star size={14} />
                               </button>
                               <button
-                                onClick={() => onPlayCombo(conv.path, conv.startFrame, conv.endFrame)}
+                                onClick={() => onPlayCombo(conv.path, conv.startFrame ?? 0, conv.endFrame ?? (conv.startFrame ?? 0) + 60)}
                                 className="flex items-center gap-2 h-9 px-4 btn-play rounded-lg text-xs"
                               >
                                 <Play size={12} fill="currentColor" />

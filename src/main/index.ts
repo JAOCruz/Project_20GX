@@ -1,4 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+
+// Disable GPU acceleration to prevent black screen issues on some systems
+app.disableHardwareAcceleration()
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Store from 'electron-store'
@@ -129,7 +132,7 @@ function createSlippiCommFile(replayPath: string, startFrame?: number, endFrame?
     data.startFrame = adjustedFrame
   }
 
-  if (endFrame !== undefined) {
+  if (typeof endFrame === 'number' && !isNaN(endFrame)) {
     // Stop shortly after the combo ends
     data.endFrame = endFrame + 30
   }

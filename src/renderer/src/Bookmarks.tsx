@@ -242,7 +242,7 @@ function Bookmarks({ onPlayCombo }: Props) {
                         ANALYZE
                       </button>
                       <button
-                        onClick={() => onPlayCombo(b.path, b.startFrame, b.endFrame)}
+                        onClick={() => onPlayCombo(b.path, b.startFrame ?? 0, b.endFrame ?? (b.startFrame ?? 0) + 60)}
                         className="flex items-center gap-2 h-9 px-4 btn-play rounded-lg text-xs"
                       >
                         <Play size={12} fill="currentColor" />
