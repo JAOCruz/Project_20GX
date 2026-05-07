@@ -459,7 +459,7 @@ ipcMain.handle('select-folder', async () => {
 
 ipcMain.handle('select-file', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openFile']
+    properties: process.platform === 'darwin' ? ['openFile', 'openDirectory'] : ['openFile']
   })
   return result.canceled ? null : result.filePaths[0]
 })
