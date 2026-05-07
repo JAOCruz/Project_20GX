@@ -45,11 +45,108 @@ function saveCache(cache: Record<string, CacheEntry>) {
 
 // --- Dolphin / Slippi Playback Helpers ---
 
-const TRAINING_CODES = [
-  { id: 'actionable-green', name: 'Turn Green When Actionable' },
-  { id: 'lcancel-red', name: 'Flash Red on Unsuccessful L-Cancel' },
-  { id: 'iasa-yellow', name: 'Yellow Color Overlay During IASA Frames' },
-  { id: 'fastfall-cyan', name: 'Turn Cyan when Fastfall is Available' },
+interface TrainingCodeDef {
+  id: string
+  name: string
+  definition: string[]
+}
+
+const TRAINING_CODES: TrainingCodeDef[] = [
+  {
+    id: 'actionable-green',
+    name: 'Turn Green When Actionable',
+    definition: [
+      'C20CC818 00000011',
+      '3CE08048 80E79D30',
+      '54E7443E 2C070208',
+      '40820018 80EDB61C',
+      '88E70000 891F000C',
+      '7C074000 40820058',
+      '48000049 7CA802A6',
+      'C0250000 D03F04BC',
+      'C0250004 D03F04C4',
+      '38600000 907F04C0',
+      '907F04B8 907F04C8',
+      '907F04CC 907F04D0',
+      '907F04D4 38600001',
+      '889F0504 50643E30',
+      '989F0504 48000010',
+      '4E800021 437F0000',
+      '43340000 80010024',
+      '60000000 00000000',
+      'C208A478 00000011',
+      '3CE08048 80E79D30',
+      '54E7443E 2C070208',
+      '40820018 80EDB61C',
+      '88E70000 891F000C',
+      '7C074000 40820058',
+      '48000049 7CA802A6',
+      'C0250000 D03F04BC',
+      'C0250004 D03F04C4',
+      '38600000 907F04C0',
+      '907F04B8 907F04C8',
+      '907F04CC 907F04D0',
+      '907F04D4 38600001',
+      '889F0504 50643E30',
+      '989F0504 48000010',
+      '4E800021 437F0000',
+      '43340000 8001002C',
+      '60000000 00000000',
+    ],
+  },
+  {
+    id: 'lcancel-red',
+    name: 'Flash Red on Unsuccessful L-Cancel',
+    definition: [
+      'C208D690 00000003',
+      '88A5067F 2C050007',
+      '4180000C 39E000D4',
+      '99E30564 00000000',
+      'C20C0148 0000000C',
+      '387F0488 89FE0564',
+      '2C0F00D4 41820008',
+      '4800004C 39E00091',
+      '99FE0564 3DE0437F',
+      '91FE0518 3DE0C200',
+      '91FE0524 3DE00000',
+      '91FE051C 91FE0520',
+      '91FE0528 91FE052C',
+      '91FE0530 3DE0C280',
+      '91FE0534 3DE0800C',
+      '61EF0150 7DE903A6',
+      '4E800420 00000000',
+    ],
+  },
+  {
+    id: 'iasa-yellow',
+    name: 'Yellow Color Overlay During IASA Frames',
+    definition: [
+      'C2071960 00000007',
+      '98032218 98030504',
+      '3C00437F 900304B8',
+      '900304BC 900304C4',
+      '38000000 900304C0',
+      '900304C8 900304CC',
+      '900304D0 900304D4',
+      '60000000 00000000',
+    ],
+  },
+  {
+    id: 'fastfall-cyan',
+    name: 'Turn Cyan when Fastfall is Available',
+    definition: [
+      'C207D554 00000009',
+      '88030504 2C000091',
+      '41A20038 3C00C200',
+      '900304BC 900304C0',
+      '900304C4 38000000',
+      '900304B8 900304C8',
+      '900304CC 900304D0',
+      '3C00C280 900304D4',
+      '38000091 98030504',
+      'C0230624 00000000',
+    ],
+  },
 ]
 
 /** Find the actual Slippi Playback Dolphin binary from launcher path */
@@ -176,6 +273,52 @@ function getEnabledTrainingCodes(iniPath: string): string[] {
   }
 }
 
+/** Check if a code definition already exists in the [Gecko] section */
+function codeDefinitionExists(lines: string[], codeName: string): boolean {
+  let inGeckoSection = false
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '[Gecko]') {
+      inGeckoSection = true
+      continue
+    }
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      inGeckoSection = false
+      continue
+    }
+    if (inGeckoSection && trimmed.startsWith('$')) {
+      const name = trimmed.replace(/^\$/, '').trim()
+      if (name === codeName) return true
+    }
+  }
+  return false
+}
+
+/** Inject a code definition into the [Gecko] section if missing */
+function injectCodeDefinition(lines: string[], codeDef: TrainingCodeDef): void {
+  if (codeDefinitionExists(lines, codeDef.name)) return
+
+  // Find [Gecko] section
+  let geckoIndex = lines.findIndex((l) => l.trim() === '[Gecko]')
+  if (geckoIndex === -1) {
+    // No [Gecko] section — prepend one
+    lines.unshift('[Gecko]')
+    geckoIndex = 0
+  }
+
+  // Find end of [Gecko] section (next section or end of file)
+  let insertIndex = geckoIndex + 1
+  for (let i = geckoIndex + 1; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) break
+    insertIndex = i + 1
+  }
+
+  // Insert blank line + code header + definition lines
+  const block = ['', '$' + codeDef.name, ...codeDef.definition]
+  lines.splice(insertIndex, 0, ...block)
+}
+
 /** Toggle a training code on/off in GALE01.ini */
 function setTrainingCodeEnabled(iniPath: string, codeId: string, enabled: boolean): boolean {
   try {
@@ -191,6 +334,12 @@ function setTrainingCodeEnabled(iniPath: string, codeId: string, enabled: boolea
     }
 
     const lines = content.split(/\r?\n/)
+
+    // Ensure code definition exists in [Gecko] before enabling
+    if (enabled) {
+      injectCodeDefinition(lines, codeDef)
+    }
+
     let inEnabledSection = false
     let enabledSectionIndex = -1
     let codeLineIndex = -1
@@ -792,12 +941,14 @@ ipcMain.handle('get-training-mods', async () => {
   }
 
   const enabledIds = getEnabledTrainingCodes(iniPath)
+  const lines = fs.readFileSync(iniPath, 'utf-8').split(/\r?\n/)
   return {
     available: true,
     codes: TRAINING_CODES.map((c) => ({
       id: c.id,
       name: c.name,
-      enabled: enabledIds.includes(c.id)
+      enabled: enabledIds.includes(c.id),
+      definitionPresent: codeDefinitionExists(lines, c.name)
     }))
   }
 })

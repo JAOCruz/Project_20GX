@@ -12,7 +12,7 @@ interface Window {
     analyzeMissedOpportunities: (replayPath: string, startFrame: number, endFrame: number, playerIndex: number) => Promise<{ success: boolean; error?: string; opportunities: any[] }>
     getReplayWinner: (replayPath: string) => Promise<{ winnerPort: number | null }>
     openReplay: (replayPath: string, startFrame?: number, endFrame?: number) => Promise<{ success: boolean; error?: string; frameSeek?: boolean; fallback?: boolean }>
-    getTrainingMods: () => Promise<{ available: boolean; error?: string; codes?: { id: string; name: string; enabled: boolean }[] }>
+    getTrainingMods: () => Promise<{ available: boolean; error?: string; codes?: { id: string; name: string; enabled: boolean; definitionPresent?: boolean }[] }>
     setTrainingMod: (codeId: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>
     getBookmarks: () => Promise<any[]>
     addBookmark: (bookmark: any) => Promise<{ success: boolean; bookmark?: any }>

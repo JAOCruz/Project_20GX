@@ -926,7 +926,7 @@ function App() {
                       </label>
                     ))}
                     <p className="text-xs text-slate-700 font-mono-data mt-2">
-                      Changes apply on next replay launch. A backup of GALE01.ini is created automatically.
+                      Code definitions are auto-injected into GALE01.ini if missing. Changes apply on next replay launch. A backup is created automatically.
                     </p>
                   </div>
                 )}

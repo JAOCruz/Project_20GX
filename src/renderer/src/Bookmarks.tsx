@@ -261,6 +261,9 @@ function Bookmarks({ onPlayCombo }: Props) {
                   {trainingCodes.length > 0 && (
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-[10px] font-orbitron tracking-wider text-slate-600">OVERLAYS</span>
+                      <span className="text-[10px] text-slate-700 font-mono-data hidden sm:inline" title="Toggles inject Gecko codes into Dolphin's GALE01.ini. Launch any replay to see them.">
+                        (toggle → launch replay)
+                      </span>
                       {trainingCodes.map((code) => (
                         <button
                           key={code.id}
