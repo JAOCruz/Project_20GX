@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Play, Star, Trash2, X, Film, Dumbbell, Lightbulb } from 'lucide-react'
 import { CHARACTERS } from './constants'
+import { StockIcon } from './components/StockIcon'
 
 interface Bookmark {
   id: string
@@ -203,12 +204,14 @@ function Bookmarks({ onPlayCombo }: Props) {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <StockIcon characterId={b.playerCharacter ?? -1} size={18} />
                         <span className="text-base font-bold text-cyan-400">
                           {CHARACTERS[b.playerCharacter ?? -1] || 'Unknown'}
                         </span>
                         <span className="text-sm text-slate-500">
                           {b.didKill ? 'took stock from' : 'comboed'}
                         </span>
+                        <StockIcon characterId={b.opponentCharacter ?? -1} size={18} />
                         <span className="text-base font-bold text-slate-300">
                           {CHARACTERS[b.opponentCharacter ?? -1] || 'Unknown'}
                         </span>

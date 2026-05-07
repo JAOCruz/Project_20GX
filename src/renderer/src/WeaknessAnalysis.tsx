@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Shield, Sword, Skull, TrendingDown, Target, Zap, ChevronRight, Dumbbell, X } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
+import { StockIcon } from './components/StockIcon'
 
 interface Player {
   port: number
@@ -276,6 +277,7 @@ function WeaknessAnalysis({ replays }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
+                    <StockIcon characterId={char.characterId} size={24} />
                     <span className="text-lg font-bold text-slate-100 font-orbitron">{char.characterName}</span>
                     <span className={`text-sm font-mono-data font-bold ${char.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
                       {formatPercent(char.winRate)} WR

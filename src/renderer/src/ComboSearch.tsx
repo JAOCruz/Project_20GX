@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb, RefreshCw } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName, getSearchableMoves, formatComboString } from './moves'
+import { StockIcon } from './components/StockIcon'
 
 interface ComboMove {
   frame: number
@@ -671,12 +672,14 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                             <div className="flex-1 min-w-0">
                               {/* Character matchup — shows WHO is doing the comboing */}
                               <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <StockIcon characterId={conv.playerCharacter ?? -1} size={18} />
                                 <span className="text-base font-bold text-cyan-400">
                                   {CHARACTERS[conv.playerCharacter ?? -1] || 'Unknown'}
                                 </span>
                                 <span className="text-base text-slate-500">
                                   {conv.didKill ? 'took stock from' : 'comboed'}
                                 </span>
+                                <StockIcon characterId={conv.opponentCharacter ?? -1} size={18} />
                                 <span className="text-base font-bold text-slate-300">
                                   {CHARACTERS[conv.opponentCharacter ?? -1] || 'Unknown'}
                                 </span>

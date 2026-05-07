@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
+import { StockIcon } from './components/StockIcon'
 import ComboSearch from './ComboSearch'
 import StatsDashboard from './StatsDashboard'
 import WeaknessAnalysis from './WeaknessAnalysis'
@@ -730,6 +731,7 @@ function App() {
                                 {idx > 0 && (
                                   <span className="text-slate-700 text-xs font-orbitron font-bold">VS</span>
                                 )}
+                                <StockIcon characterId={player.characterId ?? -1} size={20} />
                                 <span className="text-[15px] font-semibold text-slate-200">
                                   {CHARACTERS[player.characterId] || `Char ${player.characterId}`}
                                 </span>
@@ -744,7 +746,7 @@ function App() {
                                   </span>
                                 )}
                                 {player.nametag && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700/50 font-mono-data">
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-600/50 font-mono-data">
                                     {player.nametag}
                                   </span>
                                 )}

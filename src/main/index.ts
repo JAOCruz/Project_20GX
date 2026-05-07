@@ -522,69 +522,79 @@ ipcMain.handle('scan-replays', async (event, folderPath: string) => {
   const newCache: Record<string, CacheEntry> = {}
   const replays: any[] = []
 
-  const BATCH_SIZE = 100
-  const PROGRESS_INTERVAL = 25
+  const CONCURRENCY = 16
+  const PROGRESS_INTERVAL = 50
 
-  for (let i = 0; i < files.length; i++) {
-    if (cancelScanFlag) {
-      break
-    }
+  // Process files in parallel batches for much faster scanning
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    if (cancelScanFlag) break
 
-    const filePath = files[i]
+    const batch = files.slice(i, i + CONCURRENCY)
 
     // Send progress update
-    if (i % PROGRESS_INTERVAL === 0 || i === files.length - 1) {
-      sendProgress(i + 1, files.length)
+    if (i % PROGRESS_INTERVAL === 0 || i + CONCURRENCY >= files.length) {
+      sendProgress(Math.min(i + CONCURRENCY, files.length), files.length)
     }
 
-    try {
-      const stat = fs.statSync(filePath)
-      const cached = cache[filePath]
+    const results = await Promise.all(
+      batch.map(async (filePath) => {
+        try {
+          const stat = fs.statSync(filePath)
+          const cached = cache[filePath]
 
-      // Use cache if file hasn't changed AND cache version matches
-      if (cached && cached.mtimeMs === stat.mtimeMs && cached.version === CACHE_VERSION) {
-        replays.push(cached.data)
-        newCache[filePath] = cached
-        continue
+          // Use cache if file hasn't changed AND cache version matches
+          if (cached && cached.mtimeMs === stat.mtimeMs && cached.version === CACHE_VERSION) {
+            return { type: 'cached' as const, filePath, data: cached.data, entry: cached }
+          }
+
+          const game = new SlippiGame(filePath)
+          const settings = game.getSettings()
+          const metadata = game.getMetadata()
+
+          if (!settings || !metadata) return null
+
+          const data = {
+            path: filePath,
+            fileName: path.basename(filePath),
+            date: metadata.startAt,
+            lastFrame: metadata.lastFrame,
+            stageId: settings.stageId,
+            isTeams: settings.isTeams,
+            winnerPort: null as number | null,
+            month: getMonthLabel(folderPath, filePath),
+            combos: null as any[] | null, // indexed separately for performance
+            players: settings.players.map((p: any) => ({
+              port: p.port,
+              characterId: p.characterId,
+              characterColor: p.characterColor,
+              teamId: p.teamId,
+              connectCode: p.connectCode,
+              displayName: p.displayName,
+              nametag: p.nametag
+            }))
+          }
+
+          return { type: 'fresh' as const, filePath, data, mtimeMs: stat.mtimeMs }
+        } catch (e) {
+          console.error('Parse error:', filePath, e)
+          return null
+        }
+      })
+    )
+
+    for (const result of results) {
+      if (!result) continue
+      if (result.type === 'cached') {
+        replays.push(result.data)
+        newCache[result.filePath] = result.entry
+      } else {
+        replays.push(result.data)
+        newCache[result.filePath] = { mtimeMs: result.mtimeMs, version: CACHE_VERSION, data: result.data }
       }
-
-      const game = new SlippiGame(filePath)
-      const settings = game.getSettings()
-      const metadata = game.getMetadata()
-
-      if (!settings || !metadata) continue
-
-      const data = {
-        path: filePath,
-        fileName: path.basename(filePath),
-        date: metadata.startAt,
-        lastFrame: metadata.lastFrame,
-        stageId: settings.stageId,
-        isTeams: settings.isTeams,
-        winnerPort: null as number | null,
-        month: getMonthLabel(folderPath, filePath),
-        combos: null as any[] | null, // indexed separately for performance
-        players: settings.players.map((p: any) => ({
-          port: p.port,
-          characterId: p.characterId,
-          characterColor: p.characterColor,
-          teamId: p.teamId,
-          connectCode: p.connectCode,
-          displayName: p.displayName,
-          nametag: p.nametag
-        }))
-      }
-
-      replays.push(data)
-      newCache[filePath] = { mtimeMs: stat.mtimeMs, version: CACHE_VERSION, data }
-    } catch (e) {
-      console.error('Parse error:', filePath, e)
     }
 
-    // Yield to event loop
-    if (i > 0 && i % BATCH_SIZE === 0) {
-      await new Promise((resolve) => setImmediate(resolve))
-    }
+    // Yield to event loop between batches
+    await new Promise((resolve) => setImmediate(resolve))
   }
 
   saveCache(newCache)

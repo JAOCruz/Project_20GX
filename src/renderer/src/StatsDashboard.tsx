@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { BarChart3, Sword, Skull, MapPin, Calendar, TrendingUp, Activity, Target } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName } from './moves'
+import { StockIcon } from './components/StockIcon'
 
 interface Player {
   port: number
@@ -37,7 +38,7 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
-function Bar({ value, max, color = 'cyan', label, count }: { value: number; max: number; color?: string; label: string; count: number }) {
+function Bar({ value, max, color = 'cyan', label, count, prefix }: { value: number; max: number; color?: string; label: string; count: number; prefix?: React.ReactNode }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   const colorClasses: Record<string, string> = {
     cyan: 'bg-cyan-500/60',
@@ -48,7 +49,10 @@ function Bar({ value, max, color = 'cyan', label, count }: { value: number; max:
   }
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs text-slate-400 font-mono-data w-24 truncate text-right shrink-0">{label}</span>
+      <span className="text-xs text-slate-400 font-mono-data w-24 truncate text-right shrink-0 flex items-center justify-end gap-1.5">
+        {prefix}
+        {label}
+      </span>
       <div className="flex-1 h-5 bg-slate-800/50 rounded-full overflow-hidden relative">
         <div
           className={`h-full ${colorClasses[color] || colorClasses.cyan} rounded-full transition-all duration-500`}
@@ -279,6 +283,7 @@ function StatsDashboard({ replays }: Props) {
                     max={maxCharGames}
                     count={char.count}
                     color="cyan"
+                    prefix={<StockIcon characterId={char.id} size={14} />}
                   />
                 ))}
               </div>
@@ -368,7 +373,10 @@ function StatsDashboard({ replays }: Props) {
                 <div className="space-y-2">
                   {stats.lCancelArray.map((lc) => (
                     <div key={lc.characterId} className="flex items-center gap-3">
-                      <span className="text-xs text-slate-300 font-mono-data w-24 truncate">{lc.characterName}</span>
+                      <span className="text-xs text-slate-300 font-mono-data w-24 truncate flex items-center gap-1.5">
+                        <StockIcon characterId={lc.characterId} size={14} />
+                        {lc.characterName}
+                      </span>
                       <div className="flex-1 h-4 bg-slate-800/50 rounded-full overflow-hidden relative">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${lc.rate >= 90 ? 'bg-green-500/60' : lc.rate >= 70 ? 'bg-yellow-500/60' : 'bg-red-500/60'}`}
