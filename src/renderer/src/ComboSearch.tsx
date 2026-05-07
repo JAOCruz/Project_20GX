@@ -31,7 +31,7 @@ interface Replay {
 
 interface Props {
   replays: Replay[]
-  onPlayCombo: (path: string, startFrame: number) => void
+  onPlayCombo: (path: string, startFrame: number, endFrame: number) => void
   onIndexCombos: (daysBack?: number) => Promise<void>
   indexing: boolean
   indexProgress: { current: number; total: number }
@@ -113,6 +113,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const [expandedGame, setExpandedGame] = useState<string | null>(null)
   const [analyses, setAnalyses] = useState<Record<string, { loading: boolean; opportunities: any[] }>>({})
   const [scope, setScope] = useState<number>(7) // default: this week
+  const [perspective, setPerspective] = useState<'aggressor' | 'victim' | 'both'>('both')
 
   // Extract all conversions from all replays
   const allConversions = useMemo(() => {
@@ -169,7 +170,13 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
     let interactions = [...replay.combos]
 
     if (charFilter !== null) {
-      interactions = interactions.filter((c) => c.playerCharacter === charFilter)
+      if (perspective === 'aggressor') {
+        interactions = interactions.filter((c) => c.playerCharacter === charFilter)
+      } else if (perspective === 'victim') {
+        interactions = interactions.filter((c) => c.opponentCharacter === charFilter)
+      } else {
+        interactions = interactions.filter((c) => c.playerCharacter === charFilter || c.opponentCharacter === charFilter)
+      }
     }
 
     if (opponentFilter !== null) {
@@ -250,13 +257,14 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
     setSearchTerm('')
     setTagFilter('')
     setExpandedGame(null)
+    setPerspective('both')
   }
 
   const handleScopeIndex = () => {
     onIndexCombos(scope > 0 ? scope : undefined)
   }
 
-  const hasFilters = charFilter !== null || opponentFilter !== null || stageFilter !== null || categoryFilter !== 'all' || moveSequence.some((m) => m !== -1) || minDamage > 0 || showAll || searchTerm !== '' || tagFilter !== ''
+  const hasFilters = charFilter !== null || opponentFilter !== null || stageFilter !== null || categoryFilter !== 'all' || moveSequence.some((m) => m !== -1) || minDamage > 0 || showAll || searchTerm !== '' || tagFilter !== '' || perspective !== 'both'
 
   const totalKills = allConversions.filter((c) => c.didKill).length
   const indexPercent = indexProgress.total > 0
@@ -310,6 +318,19 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
               {Object.entries(CHARACTERS).map(([id, name]) => (
                 <option key={id} value={id}>{name}</option>
               ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-orbitron tracking-wider text-slate-500">VIEW</span>
+            <select
+              value={perspective}
+              onChange={(e) => setPerspective(e.target.value as 'aggressor' | 'victim' | 'both')}
+              className="h-9 px-3 bg-slate-950/50 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-cyan-500/30"
+            >
+              <option value="both">Both Roles</option>
+              <option value="aggressor">As Aggressor</option>
+              <option value="victim">As Victim</option>
             </select>
           </div>
 
@@ -703,7 +724,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                 <Star size={14} />
                               </button>
                               <button
-                                onClick={() => onPlayCombo(conv.path, conv.startFrame)}
+                                onClick={() => onPlayCombo(conv.path, conv.startFrame, conv.endFrame)}
                                 className="flex items-center gap-2 h-9 px-4 btn-play rounded-lg text-xs"
                               >
                                 <Play size={12} fill="currentColor" />

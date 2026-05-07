@@ -11,8 +11,8 @@ const api = {
   analyzeMissedOpportunities: (replayPath: string, startFrame: number, endFrame: number, playerIndex: number) =>
     ipcRenderer.invoke('analyze-missed-opportunities', replayPath, startFrame, endFrame, playerIndex),
   getReplayWinner: (replayPath: string) => ipcRenderer.invoke('get-replay-winner', replayPath),
-  openReplay: (replayPath: string, startFrame?: number) =>
-    ipcRenderer.invoke('open-replay', replayPath, startFrame),
+  openReplay: (replayPath: string, startFrame?: number, endFrame?: number) =>
+    ipcRenderer.invoke('open-replay', replayPath, startFrame, endFrame),
   getTrainingMods: () => ipcRenderer.invoke('get-training-mods'),
   setTrainingMod: (codeId: string, enabled: boolean) =>
     ipcRenderer.invoke('set-training-mod', codeId, enabled),

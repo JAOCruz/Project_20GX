@@ -110,7 +110,7 @@ function findGale01Ini(dolphinPath: string): string | null {
 }
 
 /** Write a Slippi communication JSON file for frame-seeking playback */
-function createSlippiCommFile(replayPath: string, startFrame?: number): string {
+function createSlippiCommFile(replayPath: string, startFrame?: number, endFrame?: number): string {
   const tempDir = path.join(app.getPath('temp'), 'ssbm-coach')
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true })
@@ -124,9 +124,14 @@ function createSlippiCommFile(replayPath: string, startFrame?: number): string {
   }
 
   if (startFrame !== undefined) {
-    // Start ~2 seconds before the combo so you see the setup
-    const adjustedFrame = Math.max(-123, startFrame - 120)
+    // Start ~1 second before the combo so you see the setup
+    const adjustedFrame = Math.max(-123, startFrame - 60)
     data.startFrame = adjustedFrame
+  }
+
+  if (endFrame !== undefined) {
+    // Stop shortly after the combo ends
+    data.endFrame = endFrame + 30
   }
 
   fs.writeFileSync(commPath, JSON.stringify(data, null, 2))
@@ -675,7 +680,7 @@ ipcMain.handle('launch-uncle-punch', async () => {
   })
 })
 
-ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number) => {
+ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number, endFrame?: number) => {
   const dolphinPath = store.get('dolphinPath', '') as string
 
   if (!dolphinPath) {
@@ -691,7 +696,7 @@ ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number)
 
   if (playbackDolphin) {
     // Use Slippi comm spec (-i JSON) for frame-seeking support
-    const commFile = createSlippiCommFile(replayPath, startFrame)
+    const commFile = createSlippiCommFile(replayPath, startFrame, endFrame)
 
     return new Promise((resolve) => {
       if (process.platform === 'darwin') {

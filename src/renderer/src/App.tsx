@@ -786,8 +786,8 @@ function App() {
         {activeTab === 'combos' && (
           <ComboSearch
             replays={replays}
-            onPlayCombo={(path, startFrame) => {
-              window.electron.openReplay(path, startFrame)
+            onPlayCombo={(path, startFrame, endFrame) => {
+              window.electron.openReplay(path, startFrame, endFrame)
             }}
             onIndexCombos={handleIndexCombos}
             indexing={indexing}
@@ -805,8 +805,8 @@ function App() {
 
         {activeTab === 'bookmarks' && (
           <Bookmarks
-            onPlayCombo={(path, startFrame) => {
-              window.electron.openReplay(path, startFrame)
+            onPlayCombo={(path, startFrame, endFrame) => {
+              window.electron.openReplay(path, startFrame, endFrame)
             }}
           />
         )}
