@@ -285,7 +285,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
     }
 
     return result
-  }, [filteredReplays, charFilter, opponentFilter, stageFilter, categoryFilter, moveSequence, minDamage, showAll, searchTerm, tagFilter])
+  }, [filteredReplays, charFilter, opponentFilter, stageFilter, categoryFilter, moveSequence, minDamage, showAll, searchTerm, tagFilter, perspective])
 
   const uniqueOpponents = useMemo(
     () => Array.from(new Set(allConversions.map((c: any) => c.opponentCharacter).filter((c: any): c is number => c !== undefined))).sort(),
