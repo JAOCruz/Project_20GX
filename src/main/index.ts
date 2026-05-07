@@ -15,7 +15,7 @@ const store = new Store()
 
 // --- Cache ---
 const CACHE_FILE = join(app.getPath('userData'), 'replay-cache-v2.json')
-const CACHE_VERSION = 3
+const CACHE_VERSION = 4
 
 interface CacheEntry {
   mtimeMs: number
@@ -526,8 +526,14 @@ ipcMain.handle('index-combos', async (_, daysBack: number = 0) => {
 
       if (stats?.conversions && settings && metadata) {
         entry.data.combos = stats.conversions.map((c: any) => {
-          const playerChar = settings.players.find((p: any) => p.playerIndex === c.playerIndex)?.characterId
-          const opponent = settings.players.find((p: any) => p.playerIndex !== c.playerIndex)
+          // In slippi-js, conversion.playerIndex is the VICTIM (the one getting hit)
+          // and moves[0].playerIndex / lastHitBy is the AGGRESSOR (the one landing hits)
+          const victimIndex = c.playerIndex
+          const aggressorIndex = c.moves[0]?.playerIndex ?? c.lastHitBy ?? settings.players.find((p: any) => p.playerIndex !== victimIndex)?.playerIndex
+
+          const victim = settings.players.find((p: any) => p.playerIndex === victimIndex)
+          const aggressor = settings.players.find((p: any) => p.playerIndex === aggressorIndex)
+
           const lastMoveId = c.moves[c.moves.length - 1]?.moveId
           const aerialMoves = [13, 14, 15, 16, 17] // Nair, Fair, Bair, Uair, Dair
           const isAerialKill = c.didKill && aerialMoves.includes(lastMoveId)
@@ -543,10 +549,10 @@ ipcMain.handle('index-combos', async (_, daysBack: number = 0) => {
           return {
             startFrame: c.startFrame,
             endFrame: c.endFrame,
-            playerIndex: c.playerIndex,
-            playerCharacter: playerChar,
-            opponentCharacter: opponent?.characterId,
-            opponentPort: opponent?.port,
+            playerIndex: aggressorIndex,
+            playerCharacter: aggressor?.characterId,
+            opponentCharacter: victim?.characterId,
+            opponentPort: victim?.port,
             startPercent: c.startPercent,
             endPercent: c.endPercent,
             damage: c.endPercent - c.startPercent,
