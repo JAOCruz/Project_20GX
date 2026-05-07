@@ -25,6 +25,7 @@ import StatsDashboard from './StatsDashboard'
 import WeaknessAnalysis from './WeaknessAnalysis'
 import Bookmarks from './Bookmarks'
 import Coach from './Coach'
+import { ErrorBoundary } from './ErrorBoundary'
 
 interface Player {
   port: number
@@ -784,15 +785,17 @@ function App() {
         )}
 
         {activeTab === 'combos' && (
-          <ComboSearch
-            replays={replays}
-            onPlayCombo={(path, startFrame, endFrame) => {
-              window.electron.openReplay(path, startFrame, endFrame)
-            }}
-            onIndexCombos={handleIndexCombos}
-            indexing={indexing}
-            indexProgress={scanProgress}
-          />
+          <ErrorBoundary tabName="Combos">
+            <ComboSearch
+              replays={replays}
+              onPlayCombo={(path, startFrame, endFrame) => {
+                window.electron.openReplay(path, startFrame, endFrame)
+              }}
+              onIndexCombos={handleIndexCombos}
+              indexing={indexing}
+              indexProgress={scanProgress}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'stats' && (

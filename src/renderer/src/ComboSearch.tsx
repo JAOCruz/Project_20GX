@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Play, Search, Sword, Skull, ChevronDown, ChevronUp, X, Calendar, Database, Zap, Users, Star, Dumbbell, Lightbulb, RefreshCw } from 'lucide-react'
 import { CHARACTERS, STAGES } from './constants'
 import { getMoveName, getSearchableMoves, formatComboString } from './moves'
@@ -192,50 +192,51 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
 
   // For a given replay, filter its interactions based on criteria
   const getMatchingInteractions = (replay: Replay): any[] => {
-    if (!replay.combos) return []
+    if (!replay.combos || !Array.isArray(replay.combos)) return []
 
     let interactions = [...replay.combos]
 
     if (charFilter !== null) {
       if (perspective === 'aggressor') {
-        interactions = interactions.filter((c) => c.playerCharacter === charFilter)
+        interactions = interactions.filter((c) => c?.playerCharacter === charFilter)
       } else if (perspective === 'victim') {
-        interactions = interactions.filter((c) => c.opponentCharacter === charFilter)
+        interactions = interactions.filter((c) => c?.opponentCharacter === charFilter)
       } else {
-        interactions = interactions.filter((c) => c.playerCharacter === charFilter || c.opponentCharacter === charFilter)
+        interactions = interactions.filter((c) => c?.playerCharacter === charFilter || c?.opponentCharacter === charFilter)
       }
     }
 
     if (opponentFilter !== null) {
-      interactions = interactions.filter((c) => c.opponentCharacter === opponentFilter)
+      interactions = interactions.filter((c) => c?.opponentCharacter === opponentFilter)
     }
 
     if (stageFilter !== null) {
-      interactions = interactions.filter((c) => c.stageId === stageFilter)
+      interactions = interactions.filter((c) => c?.stageId === stageFilter)
     }
 
     if (moveSequence.some((m) => m !== -1)) {
-      interactions = interactions.filter((c) => matchesSequence(c.moves, moveSequence))
+      interactions = interactions.filter((c) => matchesSequence(c?.moves ?? [], moveSequence))
     }
 
     if (minDamage > 0) {
-      interactions = interactions.filter((c) => c.damage >= minDamage)
+      interactions = interactions.filter((c) => (c?.damage ?? 0) >= minDamage)
     }
 
     if (!showAll) {
-      interactions = interactions.filter((c) => c.didKill)
+      interactions = interactions.filter((c) => !!c?.didKill)
     }
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       interactions = interactions.filter((c: any) => {
-        const moveNames = c.moves.map((m: any) => getMoveName(c.playerCharacter, m.moveId).toLowerCase())
+        const moves = c?.moves ?? []
+        const moveNames = moves.map((m: any) => getMoveName(c?.playerCharacter, m?.moveId).toLowerCase())
         return moveNames.some((name: string) => name.includes(term))
       })
     }
 
     if (categoryFilter !== 'all') {
-      interactions = interactions.filter((c: any) => c.category === categoryFilter)
+      interactions = interactions.filter((c: any) => c?.category === categoryFilter)
     }
 
     return interactions
@@ -854,7 +855,7 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
                                       className="mt-1.5 flex items-center gap-1.5 text-[11px] font-orbitron tracking-wider text-orange-400 hover:text-orange-300 transition"
                                     >
                                       <Dumbbell size={11} />
-                                      PRACTICE IN UNCLE PUNCH → {opp.unclePunchEvent.toUpperCase()}
+                                      PRACTICE IN UNCLE PUNCH → {(opp.unclePunchEvent || 'TRAINING').toUpperCase()}
                                     </button>
                                   </div>
                                 ))}

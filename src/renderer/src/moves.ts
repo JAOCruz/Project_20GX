@@ -139,9 +139,9 @@ export function getSearchableMoves(characterId?: number): { value: number; label
 }
 
 // Format a combo as a readable string
-export function formatComboString(characterId: number, moves: { moveId: number }[]): string {
-  if (moves.length === 0) return 'No moves'
+export function formatComboString(characterId: number, moves?: { moveId: number }[] | null): string {
+  if (!moves || moves.length === 0) return 'No moves'
   return moves
-    .map((m) => getMoveName(characterId, m.moveId))
+    .map((m) => getMoveName(characterId, m?.moveId))
     .join(' → ')
 }
