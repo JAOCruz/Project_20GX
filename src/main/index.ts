@@ -184,27 +184,52 @@ function findPlaybackDolphin(launcherPath: string): string | null {
 /** Find GALE01.ini path given a Dolphin binary/app path */
 function findGale01Ini(dolphinPath: string): string | null {
   if (process.platform === 'darwin') {
-    // If dolphinPath is an .app bundle
-    if (dolphinPath.endsWith('.app')) {
-      const resourcesPath = path.join(dolphinPath, 'Contents/Resources/User/GameSettings/GALE01.ini')
-      if (fs.existsSync(resourcesPath)) return resourcesPath
+    const home = process.env.HOME
+    const candidates = [
+      // Slippi Launcher playback Dolphin (most common)
+      path.join(home!, 'Library/Application Support/Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
+      // Standalone Slippi Dolphin
+      path.join(home!, 'Library/Application Support/Dolphin/User/GameSettings/GALE01.ini'),
+      path.join(home!, 'Library/Application Support/Slippi Dolphin/User/GameSettings/GALE01.ini'),
+      // Inside .app bundle (read-only fallback, last resort)
+      dolphinPath.endsWith('.app') ? path.join(dolphinPath, 'Contents/Resources/User/GameSettings/GALE01.ini') : null,
+    ].filter(Boolean) as string[]
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p
     }
 
-    // Also check Application Support
-    const home = process.env.HOME
-    const appSupportPath = path.join(
-      home!,
-      'Library/Application Support/Slippi Launcher/playback/User/GameSettings/GALE01.ini'
-    )
-    if (fs.existsSync(appSupportPath)) return appSupportPath
+    // Nothing found — auto-create in the most common location so overlays work
+    const autoCreatePath = candidates[0]
+    try {
+      fs.mkdirSync(path.dirname(autoCreatePath), { recursive: true })
+      fs.writeFileSync(autoCreatePath, '[Gecko]\n\n[Gecko_Enabled]\n')
+      console.log('Auto-created GALE01.ini at:', autoCreatePath)
+      return autoCreatePath
+    } catch (e) {
+      console.error('Failed to auto-create GALE01.ini:', e)
+    }
   } else if (process.platform === 'win32') {
-    const exeDir = path.dirname(dolphinPath)
-    const inDir = path.join(exeDir, 'User/GameSettings/GALE01.ini')
-    if (fs.existsSync(inDir)) return inDir
-
     const appData = process.env.APPDATA
-    const appSupport = path.join(appData!, 'Slippi Launcher/playback/User/GameSettings/GALE01.ini')
-    if (fs.existsSync(appSupport)) return appSupport
+    const candidates = [
+      path.join(appData!, 'Slippi Launcher/playback/User/GameSettings/GALE01.ini'),
+      path.join(path.dirname(dolphinPath), 'User/GameSettings/GALE01.ini'),
+    ]
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p
+    }
+
+    // Auto-create
+    const autoCreatePath = candidates[0]
+    try {
+      fs.mkdirSync(path.dirname(autoCreatePath), { recursive: true })
+      fs.writeFileSync(autoCreatePath, '[Gecko]\n\n[Gecko_Enabled]\n')
+      console.log('Auto-created GALE01.ini at:', autoCreatePath)
+      return autoCreatePath
+    } catch (e) {
+      console.error('Failed to auto-create GALE01.ini:', e)
+    }
   }
   return null
 }
@@ -936,16 +961,19 @@ ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number,
 
 ipcMain.handle('get-training-mods', async () => {
   const dolphinPath = store.get('dolphinPath', '') as string
+  console.log('[get-training-mods] dolphinPath:', dolphinPath)
   if (!dolphinPath) {
     return { available: false, error: 'Dolphin path not configured', codes: [] }
   }
 
   const playbackDolphin = findPlaybackDolphin(dolphinPath)
+  console.log('[get-training-mods] playbackDolphin:', playbackDolphin)
   if (!playbackDolphin) {
     return { available: false, error: 'Playback Dolphin not found. Please select Slippi Dolphin or Slippi Launcher.', codes: [] }
   }
 
   const iniPath = findGale01Ini(playbackDolphin)
+  console.log('[get-training-mods] iniPath:', iniPath)
   if (!iniPath) {
     return { available: false, error: 'GALE01.ini not found', codes: [] }
   }

@@ -142,9 +142,12 @@ function ComboSearch({ replays, onPlayCombo, onIndexCombos, indexing, indexProgr
   const loadTrainingCodes = async () => {
     try {
       const result = await window.electron.getTrainingMods()
+      console.log('[ComboSearch] getTrainingMods result:', result)
       if (result.available && result.codes) {
         setTrainingCodes(result.codes)
         codesLoadedRef.current = true
+      } else {
+        console.log('[ComboSearch] Training mods not available:', result.error)
       }
     } catch (e) {
       console.error('Failed to load training codes:', e)
