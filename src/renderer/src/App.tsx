@@ -265,6 +265,10 @@ function App() {
     }
   }
 
+  const handleCloseDolphin = async () => {
+    await window.electron.closeDolphin()
+  }
+
   const handleRefresh = async () => {
     if (!config.replayFolder) {
       setError('No replay folder configured. Go to Settings.')
@@ -440,6 +444,14 @@ function App() {
               REFRESH
             </button>
           )}
+          <button
+            onClick={handleCloseDolphin}
+            className="flex items-center gap-2 h-9 px-3 rounded-lg text-xs font-orbitron tracking-wider text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/10 transition"
+            title="Close any running Dolphin"
+          >
+            <X size={13} />
+            CLOSE DOLPHIN
+          </button>
           <nav className="flex gap-1 p-1 rounded-xl bg-slate-900/60 border border-slate-700/20">
           <button
             onClick={() => setActiveTab('library')}

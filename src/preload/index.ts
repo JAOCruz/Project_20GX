@@ -22,6 +22,7 @@ const api = {
   clearBookmarks: () => ipcRenderer.invoke('clear-bookmarks'),
   playBookmarkQueue: () => ipcRenderer.invoke('play-bookmark-queue'),
   launchUnclePunch: () => ipcRenderer.invoke('launch-uncle-punch'),
+  closeDolphin: () => ipcRenderer.invoke('close-dolphin'),
   onScanProgress: (callback: (data: { current: number; total: number }) => void) => {
     const handler = (_: any, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('scan-progress', handler)

@@ -7,6 +7,19 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Store from 'electron-store'
 import { SlippiGame } from '@slippi/slippi-js'
 import { exec } from 'child_process'
+
+/** Kill any running Slippi Dolphin process before launching a new one */
+function killSlippiDolphin(): Promise<void> {
+  return new Promise((resolve) => {
+    if (process.platform === 'darwin') {
+      exec('pkill -f "Slippi Dolphin"', () => resolve())
+    } else if (process.platform === 'win32') {
+      exec('taskkill /IM "Slippi Dolphin.exe" /T 2>nul', () => resolve())
+    } else {
+      resolve()
+    }
+  })
+}
 import fs from 'fs'
 import path from 'path'
 import { analyzeMissedOpportunities } from './analyzer'
@@ -831,6 +844,8 @@ ipcMain.handle('launch-uncle-punch', async () => {
 
   const playbackDolphin = findPlaybackDolphin(dolphinPath)
 
+  await killSlippiDolphin()
+
   return new Promise((resolve) => {
     if (process.platform === 'darwin') {
       const binaryPath = playbackDolphin && playbackDolphin.endsWith('.app')
@@ -861,6 +876,11 @@ ipcMain.handle('launch-uncle-punch', async () => {
   })
 })
 
+ipcMain.handle('close-dolphin', async () => {
+  await killSlippiDolphin()
+  return { success: true }
+})
+
 ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number, endFrame?: number) => {
   const dolphinPath = store.get('dolphinPath', '') as string
 
@@ -871,6 +891,9 @@ ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number,
   if (!fs.existsSync(dolphinPath)) {
     return { success: false, error: 'Dolphin not found at configured path.' }
   }
+
+  // Kill any existing Dolphin before launching a new replay
+  await killSlippiDolphin()
 
   // Try to find the actual Slippi Playback Dolphin for frame-seeking
   const playbackDolphin = findPlaybackDolphin(dolphinPath)
