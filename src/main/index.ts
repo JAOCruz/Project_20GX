@@ -236,14 +236,14 @@ function createSlippiCommFile(replayPath: string, startFrame?: number, endFrame?
   }
 
   if (startFrame !== undefined) {
-    // Start ~1 second before the combo so you see the setup
-    const adjustedFrame = Math.max(-123, Math.floor(startFrame) - 60)
+    // Start ~2 seconds before the combo so you see the setup
+    const adjustedFrame = Math.max(-123, Math.floor(startFrame) - 120)
     data.startFrame = adjustedFrame
   }
 
   if (typeof endFrame === 'number' && !isNaN(endFrame)) {
-    // Stop shortly after the combo ends
-    data.endFrame = Math.floor(endFrame) + 30
+    // Stop ~2 seconds after the combo ends
+    data.endFrame = Math.floor(endFrame) + 120
   }
 
   fs.writeFileSync(commPath, JSON.stringify(data, null, 2))
