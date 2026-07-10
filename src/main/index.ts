@@ -6,18 +6,87 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Store from 'electron-store'
 import { SlippiGame } from '@slippi/slippi-js'
-import { exec } from 'child_process'
+import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 
-/** Kill any running Slippi Dolphin process before launching a new one */
+// Frames of padding around combos/clips (120f ≈ 2 seconds at 60fps)
+const CLIP_PADDING_FRAMES = 120
+
+// Track the Dolphin process we launched so we can reuse/kill it cleanly
+let activeDolphin: ChildProcessWithoutNullStreams | null = null
+
+/** Kill the active Dolphin process (and any stray Slippi Dolphin processes) */
 function killSlippiDolphin(): Promise<void> {
   return new Promise((resolve) => {
-    if (process.platform === 'darwin') {
-      exec('pkill -f "Slippi Dolphin"', () => resolve())
-    } else if (process.platform === 'win32') {
-      exec('taskkill /IM "Slippi Dolphin.exe" /T 2>nul', () => resolve())
-    } else {
-      resolve()
+    let resolved = false
+    const done = () => {
+      if (!resolved) {
+        resolved = true
+        resolve()
+      }
     }
+
+    // 1) Gracefully terminate the specific process we spawned
+    if (activeDolphin && !activeDolphin.killed) {
+      activeDolphin.kill('SIGTERM')
+      // Give it up to 2s to exit gracefully before falling through to force kill
+      const gracefulTimer = setTimeout(() => {
+        if (activeDolphin && !activeDolphin.killed) {
+          activeDolphin.kill('SIGKILL')
+        }
+      }, 2000)
+
+      activeDolphin.on('exit', () => {
+        clearTimeout(gracefulTimer)
+        activeDolphin = null
+        done()
+      })
+
+      // Safety timeout
+      setTimeout(done, 2500)
+      return
+    }
+
+    // 2) Fallback: force-kill any stray Slippi Dolphin processes
+    if (process.platform === 'darwin') {
+      exec('pkill -x "Slippi Dolphin"', () => done())
+    } else if (process.platform === 'win32') {
+      exec('taskkill /IM "Slippi Dolphin.exe" /T /F 2>nul', () => done())
+    } else {
+      done()
+    }
+  })
+}
+
+/** Launch Dolphin and track the process so we can kill it before the next replay */
+function launchDolphin(executable: string, args: string[], useOpen = false): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    let child: ChildProcessWithoutNullStreams
+
+    try {
+      if (useOpen && process.platform === 'darwin') {
+        // `open` launches the app bundle; we can't directly track the child PID,
+        // but we can track the `open` helper process. Dolphin itself will be a
+        // separate process, so we still rely on killSlippiDolphin() fallback.
+        child = spawn('open', [executable, '--args', ...args])
+      } else {
+        child = spawn(executable, args)
+      }
+    } catch (error) {
+      resolve({ success: false, error: String(error) })
+      return
+    }
+
+    activeDolphin = child
+
+    child.on('error', (error) => {
+      console.error('Dolphin spawn error:', error)
+      if (activeDolphin === child) activeDolphin = null
+      resolve({ success: false, error: String(error) })
+    })
+
+    // Resolve as soon as the process starts. Dolphin is a GUI app that runs
+    // for a long time; we don't wait for it to exit here.
+    resolve({ success: true })
   })
 }
 import fs from 'fs'
@@ -250,13 +319,13 @@ function createSlippiCommFile(replayPath: string, startFrame?: number, endFrame?
 
   if (startFrame !== undefined) {
     // Start ~2 seconds before the combo so you see the setup
-    const adjustedFrame = Math.max(-123, Math.floor(startFrame) - 120)
+    const adjustedFrame = Math.max(-123, Math.floor(startFrame) - CLIP_PADDING_FRAMES)
     data.startFrame = adjustedFrame
   }
 
   if (typeof endFrame === 'number' && !isNaN(endFrame)) {
     // Stop ~2 seconds after the combo ends
-    data.endFrame = Math.floor(endFrame) + 120
+    data.endFrame = Math.floor(endFrame) + CLIP_PADDING_FRAMES
   }
 
   fs.writeFileSync(commPath, JSON.stringify(data, null, 2))
@@ -846,34 +915,19 @@ ipcMain.handle('launch-uncle-punch', async () => {
 
   await killSlippiDolphin()
 
-  return new Promise((resolve) => {
-    if (process.platform === 'darwin') {
-      const binaryPath = playbackDolphin && playbackDolphin.endsWith('.app')
-        ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
-        : playbackDolphin || dolphinPath
+  if (process.platform === 'darwin') {
+    const binaryPath = playbackDolphin && playbackDolphin.endsWith('.app')
+      ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
+      : playbackDolphin || dolphinPath
 
-      const cmd = binaryPath && fs.existsSync(binaryPath) && !binaryPath.endsWith('.app')
-        ? `"${binaryPath}" "${unclePunchPath}"`
-        : `open "${dolphinPath}" --args "${unclePunchPath}"`
-
-      exec(cmd, (error) => {
-        if (error) {
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
-    } else {
-      const exe = playbackDolphin || dolphinPath
-      exec(`"${exe}" "${unclePunchPath}"`, (error) => {
-        if (error) {
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
+    if (binaryPath && fs.existsSync(binaryPath) && !binaryPath.endsWith('.app')) {
+      return launchDolphin(binaryPath, [unclePunchPath])
     }
-  })
+    return launchDolphin('open', [dolphinPath, '--args', unclePunchPath], true)
+  }
+
+  const exe = playbackDolphin || dolphinPath
+  return launchDolphin(exe, [unclePunchPath])
 })
 
 ipcMain.handle('close-dolphin', async () => {
@@ -902,70 +956,36 @@ ipcMain.handle('open-replay', async (_, replayPath: string, startFrame?: number,
     // Use Slippi comm spec (-i JSON) for frame-seeking support
     const commFile = createSlippiCommFile(replayPath, startFrame, endFrame)
 
-    return new Promise((resolve) => {
-      if (process.platform === 'darwin') {
-        // On macOS, invoke the binary directly inside the app bundle.
-        // Using `open` with --args can cause Dolphin to show a selection menu
-        // instead of starting the replay immediately.
-        const binaryPath = playbackDolphin.endsWith('.app')
-          ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
-          : playbackDolphin
+    if (process.platform === 'darwin') {
+      const binaryPath = playbackDolphin.endsWith('.app')
+        ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
+        : playbackDolphin
 
-        const cmd = fs.existsSync(binaryPath)
-          ? `"${binaryPath}" -i "${commFile}"`
-          : `open "${playbackDolphin}" --args -i "${commFile}"`
-
-        exec(cmd, (error) => {
-          if (error) {
-            console.error('Failed to launch Dolphin with comm file:', error)
-            // Fall back to old behavior
-            exec(`open "${dolphinPath}" "${replayPath}"`, (err2) => {
-              if (err2) {
-                resolve({ success: false, error: String(err2) })
-              } else {
-                resolve({ success: true, fallback: true })
-              }
-            })
-          } else {
-            resolve({ success: true, frameSeek: true })
-          }
-        })
-      } else {
-        // Windows/Linux - invoke binary directly
-        exec(`"${playbackDolphin}" -i "${commFile}"`, (error) => {
-          if (error) {
-            console.error('Failed to launch Dolphin with comm file:', error)
-            resolve({ success: false, error: String(error) })
-          } else {
-            resolve({ success: true, frameSeek: true })
-          }
-        })
+      if (fs.existsSync(binaryPath)) {
+        const result = await launchDolphin(binaryPath, ['-i', commFile])
+        return result.success ? { success: true, frameSeek: true } : result
       }
-    })
+
+      // Fall back to `open` if the binary wasn't found inside the bundle
+      const result = await launchDolphin(playbackDolphin, ['-i', commFile], true)
+      if (!result.success) {
+        console.error('Failed to launch Dolphin with comm file:', result.error)
+        // Last resort: open the original configured path without frame seeking
+        return launchDolphin('open', [dolphinPath, replayPath], true)
+      }
+      return { success: true, frameSeek: true }
+    }
+
+    // Windows/Linux - invoke binary directly
+    const result = await launchDolphin(playbackDolphin, ['-i', commFile])
+    return result.success ? { success: true, frameSeek: true } : result
   }
 
   // Fallback: open via launcher (no frame seeking)
-  return new Promise((resolve) => {
-    if (process.platform === 'darwin' && dolphinPath.endsWith('.app')) {
-      exec(`open "${dolphinPath}" "${replayPath}"`, (error) => {
-        if (error) {
-          console.error('Failed to launch Dolphin:', error)
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
-    } else {
-      exec(`"${dolphinPath}" "${replayPath}"`, (error) => {
-        if (error) {
-          console.error('Failed to launch Dolphin:', error)
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
-    }
-  })
+  if (process.platform === 'darwin' && dolphinPath.endsWith('.app')) {
+    return launchDolphin('open', [dolphinPath, replayPath], true)
+  }
+  return launchDolphin(dolphinPath, [replayPath])
 })
 
 // --- Training Mod IPCs ---
@@ -1077,6 +1097,9 @@ ipcMain.handle('play-bookmark-queue', async () => {
     return { success: false, error: 'Playback Dolphin not found' }
   }
 
+  // Close any existing Dolphin session before starting the queue
+  await killSlippiDolphin()
+
   const tempDir = path.join(app.getPath('temp'), 'ssbm-coach')
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true })
@@ -1088,36 +1111,22 @@ ipcMain.handle('play-bookmark-queue', async () => {
     commandId: `queue-${Date.now()}`,
     queue: bookmarks.map((b) => ({
       path: b.path,
-      startFrame: Math.max(-123, b.startFrame - 120),
-      endFrame: b.endFrame + 60
+      startFrame: Math.max(-123, b.startFrame - CLIP_PADDING_FRAMES),
+      endFrame: b.endFrame + CLIP_PADDING_FRAMES
     }))
   }
 
   fs.writeFileSync(queueFile, JSON.stringify(queueData, null, 2))
 
-  return new Promise((resolve) => {
-    if (process.platform === 'darwin') {
-      const binaryPath = playbackDolphin.endsWith('.app')
-        ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
-        : playbackDolphin
-      const cmd = fs.existsSync(binaryPath)
-        ? `"${binaryPath}" -i "${queueFile}"`
-        : `open "${playbackDolphin}" --args -i "${queueFile}"`
-      exec(cmd, (error) => {
-        if (error) {
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
-    } else {
-      exec(`"${playbackDolphin}" -i "${queueFile}"`, (error) => {
-        if (error) {
-          resolve({ success: false, error: String(error) })
-        } else {
-          resolve({ success: true })
-        }
-      })
+  if (process.platform === 'darwin') {
+    const binaryPath = playbackDolphin.endsWith('.app')
+      ? path.join(playbackDolphin, 'Contents/MacOS/Slippi Dolphin')
+      : playbackDolphin
+    if (fs.existsSync(binaryPath)) {
+      return launchDolphin(binaryPath, ['-i', queueFile])
     }
-  })
+    return launchDolphin(playbackDolphin, ['-i', queueFile], true)
+  }
+
+  return launchDolphin(playbackDolphin, ['-i', queueFile])
 })
