@@ -46,9 +46,14 @@ function killSlippiDolphin(): Promise<void> {
       return
     }
 
-    // 2) Fallback: force-kill any stray Slippi Dolphin processes
+    // 2) Fallback: ask macOS to quit Dolphin gracefully, then force-kill if needed
     if (process.platform === 'darwin') {
-      exec('pkill -x "Slippi Dolphin"', () => done())
+      exec('osascript -e \'quit app "Slippi Dolphin"\'', (err) => {
+        // osascript succeeds only if the app is running; ignore errors
+        setTimeout(() => {
+          exec('pkill -x "Slippi Dolphin"', () => done())
+        }, 1500)
+      })
     } else if (process.platform === 'win32') {
       exec('taskkill /IM "Slippi Dolphin.exe" /T /F 2>nul', () => done())
     } else {
